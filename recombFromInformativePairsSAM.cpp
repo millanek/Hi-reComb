@@ -428,7 +428,8 @@ int RecombFromSAMMain(int argc, char** argv) {
         for (int j = 0; j != lengthOfInformativeSequenceWindows.size(); j++) {
             double thisWindowRate = (double)numRecombsInSizeWindows[j]/lengthOfInformativeSequenceWindows[j];
             std::cout << "window: " << windowSizeMins[j] << " - " << windowSizeMax[j] <<
-                "; rate = " << thisWindowRate << std::endl;
+                "; rate = " << thisWindowRate << "; n recomb = " << numRecombsInSizeWindows[j] <<
+                "; seqLength = " << lengthOfInformativeSequenceWindows[j] << std::endl;
         }
         
         
