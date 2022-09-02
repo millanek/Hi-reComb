@@ -370,13 +370,67 @@ int RecombFromSAMMain(int argc, char** argv) {
                 std::cout << "pos: " << left << "bp"<< std::endl;
                 
             }
-            
         }
         
         *recombFile << "0\t" << coveredHetPos[0] << "\t" << recombFractions[0] << std::endl;
         for (int i = 1; i != coveredHetPos.size(); i++) {
             *recombFile << coveredHetPos[i-1] << "\t" << coveredHetPos[i] << "\t" << recombFractions[i] << std::endl;
         }
+        
+        std::cout << std::endl;
+        std::cout << "6) Collecting stats... " << std::endl;
+        
+        
+        // Size windows are 0 - 1000bp, 1001 - 2000 bp, 2000 - 5000bp, 5000 - 10000, 10000 - 100000, 100000 - 1000000, 1M+
+        std::vector<int> numRecombsInSizeWindows(7,0);
+        std::vector<int> lengthOfInformativeSequenceWindows(7,0);
+        std::vector<int> windowSizeMins = {0,1000,2000,5000,10000,100000,1000000};
+        std::vector<int> windowSizeMax = {1000,2000,5000,10000,100000,1000000,1000000000};
+        for (int j = 0; j != phaseSwitches.size(); j++) {
+            int l = phaseSwitches[j]->posRight - phaseSwitches[j]->posRight + 1;
+            if (l > windowSizeMins[0] && l <= windowSizeMax[0]) {
+                numRecombsInSizeWindows[0]++; lengthOfInformativeSequenceWindows[0] += l;
+            } else if (l > windowSizeMins[1] && l <= windowSizeMax[1]) {
+                numRecombsInSizeWindows[1]++; lengthOfInformativeSequenceWindows[1] += l;
+            } else if (l > windowSizeMins[2] && l <= windowSizeMax[2]) {
+                numRecombsInSizeWindows[2]++; lengthOfInformativeSequenceWindows[2] += l;
+            } else if (l > windowSizeMins[3] && l <= windowSizeMax[3]) {
+                numRecombsInSizeWindows[3]++; lengthOfInformativeSequenceWindows[3] += l;
+            } else if (l > windowSizeMins[4] && l <= windowSizeMax[4]) {
+                numRecombsInSizeWindows[4]++; lengthOfInformativeSequenceWindows[4] += l;
+            } else if (l > windowSizeMins[5] && l <= windowSizeMax[5]) {
+                numRecombsInSizeWindows[5]++; lengthOfInformativeSequenceWindows[5] += l;
+            } else if (l > windowSizeMins[6]) {
+                numRecombsInSizeWindows[6]++; lengthOfInformativeSequenceWindows[6] += l;
+            }
+        }
+        
+        for (int j = 0; j != phaseConcordanceCoords.size(); j++) {
+            int l = phaseConcordanceCoords[j][1] - phaseConcordanceCoords[j][0] + 1;
+            if (l > windowSizeMins[0] && l <= windowSizeMax[0]) {
+                lengthOfInformativeSequenceWindows[0] += l;
+            } else if (l > windowSizeMins[1] && l <= windowSizeMax[1]) {
+                lengthOfInformativeSequenceWindows[1] += l;
+            } else if (l > windowSizeMins[2] && l <= windowSizeMax[2]) {
+                lengthOfInformativeSequenceWindows[2] += l;
+            } else if (l > windowSizeMins[3] && l <= windowSizeMax[3]) {
+                lengthOfInformativeSequenceWindows[3] += l;
+            } else if (l > windowSizeMins[4] && l <= windowSizeMax[4]) {
+                lengthOfInformativeSequenceWindows[4] += l;
+            } else if (l > windowSizeMins[5] && l <= windowSizeMax[5]) {
+                lengthOfInformativeSequenceWindows[5] += l;
+            } else if (l > windowSizeMins[6]) {
+                lengthOfInformativeSequenceWindows[6] += l;
+            }
+        }
+        
+        for (int j = 0; j != lengthOfInformativeSequenceWindows.size(); j++) {
+            double thisWindowRate = (double)numRecombsInSizeWindows[j]/lengthOfInformativeSequenceWindows[j];
+            std::cout << "window: " << windowSizeMins[j] << " - " << windowSizeMax[j] <<
+                "; rate = " << thisWindowRate << std::endl;
+        }
+        
+        
         //int chrSize = 0;
         //*recombFile << coveredHetPos.back() << "\t" <<  << "\t" << recombFractions[i] << std::endl;
         //print_vector(coveredHetPos, std::cout);
