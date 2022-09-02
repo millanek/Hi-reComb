@@ -16,6 +16,8 @@
 #include <fstream>
 #include <unordered_map>
 #include <getopt.h>
+#include <assert.h>
+#include <algorithm>
 
 using std::string;
 #define PROGRAM_BIN "Hi-reComb"
