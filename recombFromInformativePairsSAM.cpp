@@ -383,7 +383,7 @@ int RecombFromSAMMain(int argc, char** argv) {
         
         // Size windows are 0 - 1000bp, 1001 - 2000 bp, 2000 - 5000bp, 5000 - 10000, 10000 - 100000, 100000 - 1000000, 1M+
         std::vector<int> numRecombsInSizeWindows(7,0);
-        std::vector<int> lengthOfInformativeSequenceWindows(7,0);
+        std::vector<long long int> lengthOfInformativeSequenceWindows(7,0);
         std::vector<int> windowSizeMins = {0,1000,2000,5000,10000,100000,1000000};
         std::vector<int> windowSizeMax = {1000,2000,5000,10000,100000,1000000,1000000000};
         for (int j = 0; j != phaseSwitches.size(); j++) {
