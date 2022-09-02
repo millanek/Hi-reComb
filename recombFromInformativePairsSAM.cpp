@@ -386,42 +386,43 @@ int RecombFromSAMMain(int argc, char** argv) {
         std::vector<long long int> lengthOfInformativeSequenceWindows(7,0);
         std::vector<int> windowSizeMins = {0,1000,2000,5000,10000,100000,1000000};
         std::vector<int> windowSizeMax = {1000,2000,5000,10000,100000,1000000,1000000000};
+        int totalRecombs = 0; long long int totalL = 0;
         for (int j = 0; j != phaseSwitches.size(); j++) {
             int l = phaseSwitches[j]->posRight - phaseSwitches[j]->posLeft + 1;
             //std::cout << "l = " << l << std::endl;
             if (l > windowSizeMins[0] && l <= windowSizeMax[0]) {
-                numRecombsInSizeWindows[0]++; lengthOfInformativeSequenceWindows[0] += l;
+                numRecombsInSizeWindows[0]++; totalRecombs++; lengthOfInformativeSequenceWindows[0] += l; totalL += l;
             } else if (l > windowSizeMins[1] && l <= windowSizeMax[1]) {
-                numRecombsInSizeWindows[1]++; lengthOfInformativeSequenceWindows[1] += l;
+                numRecombsInSizeWindows[1]++; totalRecombs++; lengthOfInformativeSequenceWindows[1] += l; totalL += l;
             } else if (l > windowSizeMins[2] && l <= windowSizeMax[2]) {
-                numRecombsInSizeWindows[2]++; lengthOfInformativeSequenceWindows[2] += l;
+                numRecombsInSizeWindows[2]++; totalRecombs++; lengthOfInformativeSequenceWindows[2] += l; totalL += l;
             } else if (l > windowSizeMins[3] && l <= windowSizeMax[3]) {
-                numRecombsInSizeWindows[3]++; lengthOfInformativeSequenceWindows[3] += l;
+                numRecombsInSizeWindows[3]++; totalRecombs++; lengthOfInformativeSequenceWindows[3] += l; totalL += l;
             } else if (l > windowSizeMins[4] && l <= windowSizeMax[4]) {
-                numRecombsInSizeWindows[4]++; lengthOfInformativeSequenceWindows[4] += l;
+                numRecombsInSizeWindows[4]++; totalRecombs++; lengthOfInformativeSequenceWindows[4] += l; totalL += l;
             } else if (l > windowSizeMins[5] && l <= windowSizeMax[5]) {
-                numRecombsInSizeWindows[5]++; lengthOfInformativeSequenceWindows[5] += l;
+                numRecombsInSizeWindows[5]++; totalRecombs++; lengthOfInformativeSequenceWindows[5] += l; totalL += l;
             } else if (l > windowSizeMins[6]) {
-                numRecombsInSizeWindows[6]++; lengthOfInformativeSequenceWindows[6] += l;
+                numRecombsInSizeWindows[6]++; totalRecombs++; lengthOfInformativeSequenceWindows[6] += l; totalL += l;
             }
         }
         
         for (int j = 0; j != phaseConcordanceCoords.size(); j++) {
             int l = phaseConcordanceCoords[j][1] - phaseConcordanceCoords[j][0] + 1;
             if (l > windowSizeMins[0] && l <= windowSizeMax[0]) {
-                lengthOfInformativeSequenceWindows[0] += l;
+                lengthOfInformativeSequenceWindows[0] += l; totalL += l;
             } else if (l > windowSizeMins[1] && l <= windowSizeMax[1]) {
-                lengthOfInformativeSequenceWindows[1] += l;
+                lengthOfInformativeSequenceWindows[1] += l; totalL += l;
             } else if (l > windowSizeMins[2] && l <= windowSizeMax[2]) {
-                lengthOfInformativeSequenceWindows[2] += l;
+                lengthOfInformativeSequenceWindows[2] += l; totalL += l;
             } else if (l > windowSizeMins[3] && l <= windowSizeMax[3]) {
-                lengthOfInformativeSequenceWindows[3] += l;
+                lengthOfInformativeSequenceWindows[3] += l; totalL += l;
             } else if (l > windowSizeMins[4] && l <= windowSizeMax[4]) {
-                lengthOfInformativeSequenceWindows[4] += l;
+                lengthOfInformativeSequenceWindows[4] += l; totalL += l;
             } else if (l > windowSizeMins[5] && l <= windowSizeMax[5]) {
-                lengthOfInformativeSequenceWindows[5] += l;
+                lengthOfInformativeSequenceWindows[5] += l; totalL += l;
             } else if (l > windowSizeMins[6]) {
-                lengthOfInformativeSequenceWindows[6] += l;
+                lengthOfInformativeSequenceWindows[6] += l; totalL += l;
             }
         }
         
@@ -431,6 +432,9 @@ int RecombFromSAMMain(int argc, char** argv) {
                 "; rate = " << thisWindowRate << "; n recomb = " << numRecombsInSizeWindows[j] <<
                 "; seqLength = " << lengthOfInformativeSequenceWindows[j] << std::endl;
         }
+        
+        std::cout << "total rate = " << (double)totalRecombs/totalL << "; n recomb = " << totalRecombs <<
+            "; seqLength = " << totalL << std::endl;
         
         
         //int chrSize = 0;
