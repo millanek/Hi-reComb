@@ -57,14 +57,23 @@ class HetInfo {
 
 };
 
+
 class PhaseInfo {
     public:
     PhaseInfo() {};
     
-    PhaseInfo(int position, double qual, int cov, std::vector<char>& phasedVarsIn, int blockNumIn) {
-        pos = position; quality = qual;
-        coverage = cov;
-        phasedVars = phasedVarsIn;
+    PhaseInfo(std::vector<string>& phasedSNPdetails, int blockNumIn) {
+        int H1phase = atoi(phasedSNPdetails[1].c_str()); int H2phase = atoi(phasedSNPdetails[2].c_str());
+        assert(phasedSNPdetails[5].length() == 1); assert(phasedSNPdetails[6].length() == 1);
+        char refBase = phasedSNPdetails[5][0]; char altBase = phasedSNPdetails[6][0];
+        std::vector<char> phasedVars;
+        if (H1phase == 0 && H2phase == 1) {
+            phasedVars.push_back(refBase); phasedVars.push_back(altBase); valid = true;
+        } else if (H1phase == 1 && H2phase == 0) {
+            phasedVars.push_back(altBase); phasedVars.push_back(refBase); valid = true;
+        }
+        pos = atoi(phasedSNPdetails[4].c_str()); quality = stringToDouble(phasedSNPdetails[10].c_str());
+        coverage = atoi(phasedSNPdetails[11].c_str());
         blockNum = blockNumIn;
     };
     
@@ -73,6 +82,7 @@ class PhaseInfo {
     double quality;
     int coverage;
     int blockNum;
+    bool valid = false;
     
 };
 

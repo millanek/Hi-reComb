@@ -67,372 +67,224 @@ namespace opt
     static int minDist = 500;
 }
 
-
-
-
 int RecombFromSAMMain(int argc, char** argv) {
     parseRecombFromSAMOptions(argc, argv);
     string line; // for reading the input files
-    
-    std::ifstream* hetsFile = new std::ifstream(opt::hetsFile.c_str()); assertFileOpen(*hetsFile, opt::hetsFile);
-    std::ifstream* samFile = new std::ifstream(opt::samFile.c_str()); assertFileOpen(*samFile, opt::samFile);
-    
+        
     std::ofstream* phaseSwitchFile = new std::ofstream("switches" + opt::runName + ".txt");
     std::ofstream* recombFile = new std::ofstream("recombMap" + opt::runName + ".txt");
     std::ofstream* depthFile = new std::ofstream("recombMap_wDepth" + opt::runName + ".txt");
     
-    std::map<int,PhaseInfo*> posToPhase;
-    std::map<string,std::vector<int>> infoPairNameToPos;
-    std::map<string,std::vector<string>> infoPairNameToStrands;
-    std::vector<int> phaseBlockSNPnums;
-    
-    std::map<string,std::vector<RecombRead*>> samNameToReads;
-    int numHetPairs = 0;
-    std::unordered_map<string, ReadLinkSNPpair*> SNPpairs;
-    
-    
     std::cout << "1) Processing hets..." << std::endl;
-    if (opt::hapcutFormat) {
-        int blockNum = 0;
-        // Parse the Hapcut blocks file
-        while (getline(*hetsFile, line)) {
-            if (line[0] == '*') {
-            
-            } else if (line[0] == 'B' && line[1] == 'L') { // New block - should in the future separate the hets by blocks
-                blockNum++; phaseBlockSNPnums.push_back(0);
-            } else {
-                std::vector<string> phasedSNPdetails = split(line, '\t');
-                int snpPos = atoi(phasedSNPdetails[4].c_str());
-                int H1phase = atoi(phasedSNPdetails[1].c_str());
-                int H2phase = atoi(phasedSNPdetails[2].c_str());
-                //std::cout << "line: " << line << std::endl;
-                // std::cout << "phasedSNPdetails[5]: " << phasedSNPdetails[5] << std::endl;
-                assert(phasedSNPdetails[5].length() == 1); assert(phasedSNPdetails[6].length() == 1);
-                char refBase = phasedSNPdetails[5][0];
-                char altBase = phasedSNPdetails[6][0];
-                double phaseQual = stringToDouble(phasedSNPdetails[10].c_str());
-                int snpCoverage = atoi(phasedSNPdetails[11].c_str());
-                std::vector<char> phasedVars;
-                if (H1phase == 0 && H2phase == 1) {
-                    phasedVars.push_back(refBase); phasedVars.push_back(altBase);
-                } else if (H1phase == 1 && H2phase == 0) {
-                    phasedVars.push_back(altBase); phasedVars.push_back(refBase);
-                } else{
-                    continue;
-                }
-                PhaseInfo* thisPhase = new PhaseInfo(snpPos,phaseQual,snpCoverage,phasedVars,blockNum);
-                posToPhase[snpPos] = thisPhase;
-                phaseBlockSNPnums[blockNum-1]++;
-            }
-        }
-        //maxBlockIndex = (int)std::distance(phaseBlockSNPnums.begin(),std::max_element(phaseBlockSNPnums.begin(), phaseBlockSNPnums.end()));
-    } else {
-        while (getline(*hetsFile, line)) {
-            std::vector<string> phasedSNPdetails = split(line, '\t');
-            int snpPos = atoi(phasedSNPdetails[1].c_str());
-            assert(phasedSNPdetails[2].length() == 1); assert(phasedSNPdetails[3].length() == 1);
-            char refBase = phasedSNPdetails[2][0];
-            char altBase = phasedSNPdetails[3][0];
-            
-            std::vector<char> phasedVars;
-            phasedVars.push_back(refBase); phasedVars.push_back(altBase);
-            double phaseQual = 0; int snpCoverage = 0;
-            PhaseInfo* thisPhase = new PhaseInfo(snpPos,phaseQual,snpCoverage, phasedVars, 1);
-            posToPhase[snpPos] = thisPhase;
-        }
-        numHetPairs = nChoosek((int)posToPhase.size(),2);
-    }
-    
-    
+    AllPhaseInfo* p = new AllPhaseInfo(opt::hetsFile);
     
     std::cout << std::endl;
     std::cout << "2) Loading read-pairs... " << std::endl;
-    // Now parse the samtools file to find reads that match records from the pairstools file
-    // and therefore  can be informative about the phasing and recombination
-    int readN = 0;
-    std::vector<RecombRead*> informativeReads;
-    while (getline(*samFile,line)) {
-        // std::cerr << line << std::endl;
-        readN++;
-        std::vector<string> samRecVec = split(line, '\t'); //assert(pairVec.size() == 8);
-        RecombRead* thisRead = new RecombRead(samRecVec);
-        informativeReads.push_back(thisRead);
-    }
+    RecombReadPairs* rp = new RecombReadPairs(opt::samFile);
     
     std::cout << std::endl;
     std::cout << "3) Linking read-pairs and hets... " << std::endl;
-    int num0het = 0; int num1het = 0; int num2plusHets = 0;
-    int totalUsedLength = 0;
-    std::vector<RecombReadPair*> informativeReadPairs;
-    for (int r = 0; r < informativeReads.size(); r=r+2) {
-        RecombReadPair* thisReadPair = new RecombReadPair(informativeReads[r], informativeReads[r+1]);
-        thisReadPair->findAndCombinePairHets(posToPhase);
-        thisReadPair->filterHetsByQuality(opt::minBQ);
-        
-        if (thisReadPair->hetSites.size() == 0) {
-            num0het++;
-        } else if (thisReadPair->hetSites.size() == 1) {
-            num1het++;
-        } else {
-            num2plusHets++;
-        }
-        
-        if (thisReadPair->hetSites.size() > 1) {
-            thisReadPair->read1->linkHetsWithPhaseBlock();
-            thisReadPair->read2->linkHetsWithPhaseBlock();
-            for (std::map<int, std::vector<int>>::iterator it = thisReadPair->read1->BlockIDsToHetPos.begin();
-                it != thisReadPair->read1->BlockIDsToHetPos.end(); it++) {
-                if (thisReadPair->read2->BlockIDsToHetPos.count(it->first) == 1) {
-                    informativeReadPairs.push_back(thisReadPair);
-                    totalUsedLength += thisReadPair->read1->usedLength;
-                    totalUsedLength += thisReadPair->read2->usedLength;
-                }
-            }
-        }
-    }
-    
-    std::cout << "Initial Read Pairs.size(): " << informativeReads.size()/2.0 << std::endl;
-    std::cout << "num0het: " << num0het << std::endl;
-    std::cout << "num1het: " << num1het << std::endl;
-    std::cout << "num2plusHets: " << num2plusHets << std::endl;
-    std::cout << "informativeReadPairs.size(): " << informativeReadPairs.size() << std::endl;
-    std::cout << std::endl;
+    rp->linkWithHets(p->posToPhase, opt::minBQ);
+    rp->printReadPairStats();
     
     std::cout << "4) Categorising concordant-discordant read-pairs... " << std::endl;
-    int numConcordant = 0; int numDiscordant = 0;
-    int numMatch = 0; int numMismatch = 0; long long int totalEffectiveLength = 0;
-    std::vector<double> matchBaseScores; std::vector<double> mismatchBaseScores;
+
     std::vector<double> concordantBaseScores; std::vector<double> discordantBaseScores;
     std::vector<PhaseSwitch*> phaseSwitches;
     std::vector<std::vector<int>> phaseConcordanceCoords;
         
-    
     std::vector<int> coveredHetPos; std::vector<int> coveredHetEffectiveDepth;
     std::vector<int> coveredHetDirectDepth;
-    if (opt::hapcutFormat) {
-        int readPairsProcessed = 0;
-        for (int r = 0; r < informativeReadPairs.size(); r++) {
-            readPairsProcessed++;
-            
-           for (int i = 0; i < informativeReadPairs[r]->hetSites.size(); i++) {
-                HetInfo* thisHet = informativeReadPairs[r]->hetSites[i];
-                if (thisHet->readPhaseBaseMismatch) {
-                    numMismatch++;
-                    mismatchBaseScores.push_back(thisHet->thisBaseQuality);
-                } else {
-                    // std::cout << "Fine: " << std::endl;
-                     matchBaseScores.push_back(thisHet->thisBaseQuality);
-                     numMatch++;
-                }
-               coveredHetPos.push_back(thisHet->pos);
-            }
-            
-            // Now consider all HiC pairs i that map to the chromosome and cover a het at each end - lets call the physical locations of the hets x_i, y_i ( x < y) and let Z_i = 1 if they are in phase, 0 if out of phase (recombined)
-            
-            // Prod_i ((1-Z_i)(G(y_i)-G(x_i)) + Z_i*(1 -(G(y_i)-G(x_i))
-            
-            // std::vector<PhaseSwitch*> thisPairSwitches;
-            std::vector<int> switchPairI; std::vector<int> switchPairJ;
-            std::vector<int> concordPairI; std::vector<int> concordPairJ;
-            for (int i = 0; i < informativeReadPairs[r]->hetSites.size() - 1; i++) {
-                for (int j = 1; j < informativeReadPairs[r]->hetSites.size(); j++) {
-                    if (informativeReadPairs[r]->hetSites[i]->phaseBlock == informativeReadPairs[r]->hetSites[j]->phaseBlock) {
-                        int phaseI = informativeReadPairs[r]->hetSites[i]->thisHetPhase01;
-                        int phaseJ = informativeReadPairs[r]->hetSites[j]->thisHetPhase01;
-                        int iPos = informativeReadPairs[r]->hetSites[i]->pos;
-                        int jPos = informativeReadPairs[r]->hetSites[j]->pos;
-                        if (phaseI != phaseJ && abs(jPos - iPos) > opt::minDist) {
-                            switchPairI.push_back(i); switchPairJ.push_back(j);
-                            //int iPos = informativeReadPairs[r]->hetSites[i]->pos;
-                            //int jPos = informativeReadPairs[r]->hetSites[j]->pos;
-                            //int iQual = informativeReadPairs[r]->hetSites[i]->thisPhaseQuality;
-                            //int jQual = informativeReadPairs[r]->hetSites[j]->thisPhaseQuality;
-                            // PhaseSwitch* thisSwitch = new PhaseSwitch(iPos, jPos, iQual, jQual);
-                            // thisPairSwitches.push_back(thisSwitch);
-                        } else {
-                            concordPairI.push_back(i); concordPairJ.push_back(j);
-                        }
-                    }
-                }
-            }
-            
-            // TO DO:
-            // Select the 'right' switch pair if there are multiple options:
-            // The shortest one? Needs more thought....
-            if (switchPairI.size() > 0) {
-                numDiscordant++;
-                int iPos = informativeReadPairs[r]->hetSites[switchPairI[0]]->pos;
-                int jPos = informativeReadPairs[r]->hetSites[switchPairJ[0]]->pos;
-                int iQual = informativeReadPairs[r]->hetSites[switchPairI[0]]->thisPhaseQuality;
-                int jQual = informativeReadPairs[r]->hetSites[switchPairJ[0]]->thisPhaseQuality;
-                if (jPos - iPos < 0) {
-                    int tmp = iPos; iPos = jPos; jPos = tmp;
-                    tmp = iQual; iQual = jQual; jQual = tmp;
-                }
-                PhaseSwitch* thisSwitch = new PhaseSwitch(iPos, jPos, iQual, jQual);
-                phaseSwitches.push_back(thisSwitch);
-                switchPairI.empty(); switchPairJ.empty();
-                totalEffectiveLength = totalEffectiveLength + (jPos - iPos);
-                
+
+    int readPairsProcessed = 0;
+    for (int r = 0; r < rp->informativeReadPairs.size(); r++) {
+        readPairsProcessed++;
+        
+       for (int i = 0; i < rp->informativeReadPairs[r]->hetSites.size(); i++) {
+            HetInfo* thisHet = rp->informativeReadPairs[r]->hetSites[i];
+            if (thisHet->readPhaseBaseMismatch) {
+                rp->numMismatch++;
+                rp->mismatchBaseScores.push_back(thisHet->thisBaseQuality);
             } else {
-                numConcordant++;
-                std::vector<int> thisConcordantCoords;
-                int maxD = 0; int maxDindex = 0;
-                for (int i = 0; i != concordPairI.size(); i++) {
-                    int iPos = informativeReadPairs[r]->hetSites[concordPairI[i]]->pos;
-                    int jPos = informativeReadPairs[r]->hetSites[concordPairJ[i]]->pos;
-                    if (abs(jPos - iPos) > maxD) {
-                        maxDindex = i;
-                    }
-                }
-                int iPosDindex = informativeReadPairs[r]->hetSites[concordPairI[maxDindex]]->pos;
-                int jPosDindex = informativeReadPairs[r]->hetSites[concordPairJ[maxDindex]]->pos;
-                if (jPosDindex - iPosDindex < 0) {
-                    int tmp = iPosDindex; iPosDindex = jPosDindex; jPosDindex = tmp;
-                }
-                
-                int concordantPairDist = jPosDindex - iPosDindex;
-                totalEffectiveLength = totalEffectiveLength + concordantPairDist;
-                thisConcordantCoords.push_back(iPosDindex);
-                thisConcordantCoords.push_back(jPosDindex);
-                thisConcordantCoords.push_back(concordantPairDist);
-                phaseConcordanceCoords.push_back(thisConcordantCoords);
+                // std::cout << "Fine: " << std::endl;
+                rp->matchBaseScores.push_back(thisHet->thisBaseQuality);
+                rp->numMatch++;
+                coveredHetPos.push_back(thisHet->pos);
             }
-          /*  if (readPairsProcessed % 10000 == 0) {
-                std::cout << "readPairsProcessed: " << readPairsProcessed << std::endl;
-               // std::cout << "informativeReadPairs[r]->hetSites.size(): " << informativeReadPairs[r]->hetSites.size() << std::endl;
-                std::cout << "phaseSwitches.size(): " << phaseSwitches.size() << std::endl;
-                std::cout << "Effective coverage (bp): " << totalEffectiveLength << std::endl;
-                std::cout << std::endl;
-            } */
         }
         
-        std::cout << "Effective coverage (bp): " << totalEffectiveLength << std::endl;
-        std::cout << "numConcordant: " << numConcordant << std::endl;
-        std::cout << "numDiscordant: " << numDiscordant << std::endl;
-        std::cout << "phaseConcordanceCoords.size(): " << phaseConcordanceCoords.size() << std::endl;
+        // Now consider all HiC pairs i that map to the chromosome and cover a het at each end - lets call the physical locations of the hets x_i, y_i ( x < y) and let Z_i = 1 if they are in phase, 0 if out of phase (recombined)
         
-        std::cout << "numMatch: " << numMatch << std::endl;
-        std::cout << "numMismatch: " << numMismatch << std::endl;
-        std::cout << "Mean mismatchBaseScores: " << vector_average(mismatchBaseScores) << std::endl;
-        std::cout << "Mean matchBaseScores: " << vector_average(matchBaseScores) << std::endl;
+        // Prod_i ((1-Z_i)(G(y_i)-G(x_i)) + Z_i*(1 -(G(y_i)-G(x_i))
         
-        for (int i = 0; i != phaseSwitches.size(); i++) {
-            *phaseSwitchFile << phaseSwitches[i]->posLeft << "\t" << phaseSwitches[i]->posRight << "\t" << phaseSwitches[i]->dist << "\t" << phaseSwitches[i]->phaseQualLeft << "\t" << phaseSwitches[i]->phaseQualRight << std::endl;
-        }
-        
-        
-        std::cout << std::endl;
-        std::cout << "5) Making a genetic map... " << std::endl;
-        std::sort(coveredHetPos.begin(), coveredHetPos.end());
-        std::vector<int>::iterator it = std::unique(coveredHetPos.begin(), coveredHetPos.end());
-        coveredHetPos.resize(distance(coveredHetPos.begin(),it));
-        std::cout << "coveredHetPos.size() " << coveredHetPos.size() << std::endl;
-        
-        double meanRecombinationRate = (double)numDiscordant/(double)totalEffectiveLength;
-        std::cout << "meanRecombinationRate " << meanRecombinationRate << std::endl;
-        std::vector<double> recombFractions(coveredHetPos.size()+1, meanRecombinationRate);
-        
-        int numProcessedHets = 0;
-        for (int i = 0; i != coveredHetPos.size() - 1; i++) {
-            int left = coveredHetPos[i];
-            int right = coveredHetPos[i + 1];
-            //int distSNPs = (right - left) + 1;
-            
-            int coveringReadPairs = 0;
-            
-            double totalRecombFractionPerBP = 0;
-            for (int j = 0; j != phaseSwitches.size(); j++) {
-                if(phaseSwitches[j]->posLeft <= left && phaseSwitches[j]->posRight >= right){
-                    coveringReadPairs++;
-                    double recombFractionPerBP = (double)1.0/(double)phaseSwitches[j]->dist;
-                    totalRecombFractionPerBP += recombFractionPerBP;
-                }
-            }
-          //  std::cout << "totalRecombFraction: " << totalRecombFraction << std::endl;
-            
-            double totalConcordantFraction = 0;
-            for (int j = 0; j != phaseConcordanceCoords.size(); j++) {
-                if(phaseConcordanceCoords[j][0] <= left && phaseConcordanceCoords[j][1] >= right){
-                    coveringReadPairs++;
-                    //double concordPairFraction = (double)distSNPs/(double)(phaseConcordanceCoords[j][2]);
-                    totalConcordantFraction++;
-                }
-            }
-           // std::cout << "totalConcordantFraction: " << totalConcordantFraction << std::endl;
-            
-            if (coveringReadPairs > 10) {
-                recombFractions[i+1] = totalRecombFractionPerBP/totalConcordantFraction;
-            }
-            
-            numProcessedHets++;
-            if (numProcessedHets % 10000 == 0) {
-                std::cout << "numProcessedHets: " << numProcessedHets << " ("<< (double)numProcessedHets/coveredHetPos.size() << "%)"<< std::endl;
-                std::cout << "pos: " << left << "bp"<< std::endl;
-                
-            }
-            coveredHetEffectiveDepth.push_back(coveringReadPairs);
-        }
-        
-        *recombFile << "0\t" << coveredHetPos[0] << "\t" << recombFractions[0] << std::endl;
-        for (int i = 1; i != coveredHetPos.size(); i++) {
-            *recombFile << coveredHetPos[i-1] << "\t" << coveredHetPos[i] << "\t" << recombFractions[i] << std::endl;
-        }
-        
-        std::cout << std::endl;
-        std::cout << "6) Collecting stats... " << std::endl;
-        
-        // a) Prints out the distribition of recombination rates based on read pairs with variable-length inserts
-        collectRateStatsBasedOnInsertLength(phaseSwitches, phaseConcordanceCoords);
-        
-        int coverageDirectlyOnTheHet = 0;
-        for (int i = 0; i != coveredHetPos.size() - 1; i++) {
-            int thisHetPos = coveredHetPos[i];
-            for (int j = 0; j != phaseSwitches.size(); j++) {
-                if(phaseSwitches[j]->posLeft == thisHetPos || phaseSwitches[j]->posRight == thisHetPos){
-                    coverageDirectlyOnTheHet++;
-                }
-            }
-            for (int j = 0; j != phaseConcordanceCoords.size(); j++) {
-                if(phaseConcordanceCoords[j][0] == thisHetPos || phaseConcordanceCoords[j][1] == thisHetPos){
-                    coverageDirectlyOnTheHet++;
-                }
-            }
-            coveredHetDirectDepth.push_back(coverageDirectlyOnTheHet);
-            *depthFile << thisHetPos << "\t" << recombFractions[i] << "\t" << coveredHetEffectiveDepth[i] << "\t" << coverageDirectlyOnTheHet << std::endl;
-        }
-        
-    } else {
-        for (int r = 0; r < informativeReadPairs.size(); r++) {
-            if (informativeReadPairs[r]->hetSites.size() > 1) {
-                for (int i = 0; i < informativeReadPairs[r]->hetSites.size() - 1; i++) {
-                    for (int j = 1; j < informativeReadPairs[r]->hetSites.size(); j++) {
-                        char readBase1 = informativeReadPairs[r]->hetSites[i]->thisBase;
-                        char readBase2 = informativeReadPairs[r]->hetSites[j]->thisBase;
-                        int pos1 = informativeReadPairs[r]->hetSites[i]->pos;
-                        int pos2 = informativeReadPairs[r]->hetSites[j]->pos;
-                        string pairIndex = numToString(pos1)+"_"+numToString(pos2);
-                        if (!SNPpairs.count(pairIndex)) {
-                            SNPpairs[pairIndex] = new ReadLinkSNPpair(pos1,pos2,readBase1,readBase2);
-                        } else {
-                            SNPpairs[pairIndex]->base1.push_back(readBase1);
-                            SNPpairs[pairIndex]->base1.push_back(readBase2);
-                        }
+        // std::vector<PhaseSwitch*> thisPairSwitches;
+        std::vector<int> switchPairI; std::vector<int> switchPairJ;
+        std::vector<int> concordPairI; std::vector<int> concordPairJ;
+        for (int i = 0; i < rp->informativeReadPairs[r]->hetSites.size() - 1; i++) {
+            for (int j = 1; j < rp->informativeReadPairs[r]->hetSites.size(); j++) {
+                if (rp->informativeReadPairs[r]->hetSites[i]->phaseBlock == rp->informativeReadPairs[r]->hetSites[j]->phaseBlock) {
+                    int phaseI = rp->informativeReadPairs[r]->hetSites[i]->thisHetPhase01;
+                    int phaseJ = rp->informativeReadPairs[r]->hetSites[j]->thisHetPhase01;
+                    int iPos = rp->informativeReadPairs[r]->hetSites[i]->pos;
+                    int jPos = rp->informativeReadPairs[r]->hetSites[j]->pos;
+                    if (phaseI != phaseJ && abs(jPos - iPos) > opt::minDist) {
+                        switchPairI.push_back(i); switchPairJ.push_back(j);
+                        //int iPos = informativeReadPairs[r]->hetSites[i]->pos;
+                        //int jPos = informativeReadPairs[r]->hetSites[j]->pos;
+                        //int iQual = informativeReadPairs[r]->hetSites[i]->thisPhaseQuality;
+                        //int jQual = informativeReadPairs[r]->hetSites[j]->thisPhaseQuality;
+                        // PhaseSwitch* thisSwitch = new PhaseSwitch(iPos, jPos, iQual, jQual);
+                        // thisPairSwitches.push_back(thisSwitch);
+                    } else {
+                        concordPairI.push_back(i); concordPairJ.push_back(j);
                     }
                 }
             }
         }
-        std::cout << "SNPpairs.size(): " << SNPpairs.size() << std::endl;
-        std::cout << "totalUsedLength: " << totalUsedLength << std::endl;
-        std::cout << "totalUsedLength/(goodReadPairs.size()*300): " << (double)totalUsedLength/(double)(informativeReadPairs.size()*300) << std::endl;
+        
+        // TO DO:
+        // Select the 'right' switch pair if there are multiple options:
+        // The shortest one? Needs more thought....
+        if (switchPairI.size() > 0) {
+            rp->numDiscordant++;
+            int iPos = rp->informativeReadPairs[r]->hetSites[switchPairI[0]]->pos;
+            int jPos = rp->informativeReadPairs[r]->hetSites[switchPairJ[0]]->pos;
+            int iQual = rp->informativeReadPairs[r]->hetSites[switchPairI[0]]->thisPhaseQuality;
+            int jQual = rp->informativeReadPairs[r]->hetSites[switchPairJ[0]]->thisPhaseQuality;
+            if (jPos - iPos < 0) {
+                int tmp = iPos; iPos = jPos; jPos = tmp;
+                tmp = iQual; iQual = jQual; jQual = tmp;
+            }
+            PhaseSwitch* thisSwitch = new PhaseSwitch(iPos, jPos, iQual, jQual);
+            phaseSwitches.push_back(thisSwitch);
+            switchPairI.empty(); switchPairJ.empty();
+            rp->totalEffectiveLength = rp->totalEffectiveLength + (jPos - iPos);
+            
+        } else {
+            rp->numConcordant++;
+            std::vector<int> thisConcordantCoords;
+            int maxD = 0; int maxDindex = 0;
+            for (int i = 0; i != concordPairI.size(); i++) {
+                int iPos = rp->informativeReadPairs[r]->hetSites[concordPairI[i]]->pos;
+                int jPos = rp->informativeReadPairs[r]->hetSites[concordPairJ[i]]->pos;
+                if (abs(jPos - iPos) > maxD) {
+                    maxDindex = i;
+                }
+            }
+            int iPosDindex = rp->informativeReadPairs[r]->hetSites[concordPairI[maxDindex]]->pos;
+            int jPosDindex = rp->informativeReadPairs[r]->hetSites[concordPairJ[maxDindex]]->pos;
+            if (jPosDindex - iPosDindex < 0) {
+                int tmp = iPosDindex; iPosDindex = jPosDindex; jPosDindex = tmp;
+            }
+            
+            int concordantPairDist = jPosDindex - iPosDindex;
+            rp->totalEffectiveLength = rp->totalEffectiveLength + concordantPairDist;
+            thisConcordantCoords.push_back(iPosDindex);
+            thisConcordantCoords.push_back(jPosDindex);
+            thisConcordantCoords.push_back(concordantPairDist);
+            phaseConcordanceCoords.push_back(thisConcordantCoords);
+        }
+      /*  if (readPairsProcessed % 10000 == 0) {
+            std::cout << "readPairsProcessed: " << readPairsProcessed << std::endl;
+           // std::cout << "informativeReadPairs[r]->hetSites.size(): " << informativeReadPairs[r]->hetSites.size() << std::endl;
+            std::cout << "phaseSwitches.size(): " << phaseSwitches.size() << std::endl;
+            std::cout << "Effective coverage (bp): " << totalEffectiveLength << std::endl;
+            std::cout << std::endl;
+        } */
+    }
+    
+    rp->printRecombinationBaseStats();
+    std::cout << "phaseConcordanceCoords.size(): " << phaseConcordanceCoords.size() << std::endl;
+    
+    rp->printBaseQualityStats();
+    
+    for (int i = 0; i != phaseSwitches.size(); i++) {
+        *phaseSwitchFile << phaseSwitches[i]->posLeft << "\t" << phaseSwitches[i]->posRight << "\t" << phaseSwitches[i]->dist << "\t" << phaseSwitches[i]->phaseQualLeft << "\t" << phaseSwitches[i]->phaseQualRight << std::endl;
+    }
+    
+    
+    std::cout << std::endl;
+    std::cout << "5) Making a genetic map... " << std::endl;
+    std::sort(coveredHetPos.begin(), coveredHetPos.end());
+    std::vector<int>::iterator it = std::unique(coveredHetPos.begin(), coveredHetPos.end());
+    coveredHetPos.resize(distance(coveredHetPos.begin(),it));
+    std::cout << "coveredHetPos.size() " << coveredHetPos.size() << std::endl;
+    
+    double meanRecombinationRate = (double)rp->numDiscordant/(double)rp->totalEffectiveLength;
+    std::cout << "meanRecombinationRate " << meanRecombinationRate << std::endl;
+    std::vector<double> recombFractions(coveredHetPos.size()+1, meanRecombinationRate);
+    
+    int numProcessedHets = 0;
+    for (int i = 0; i != coveredHetPos.size() - 1; i++) {
+        int left = coveredHetPos[i];
+        int right = coveredHetPos[i + 1];
+        //int distSNPs = (right - left) + 1;
+        
+        int coveringReadPairs = 0;
+        
+        double totalRecombFractionPerBP = 0;
+        for (int j = 0; j != phaseSwitches.size(); j++) {
+            if(phaseSwitches[j]->posLeft <= left && phaseSwitches[j]->posRight >= right){
+                coveringReadPairs++;
+                double recombFractionPerBP = (double)1.0/(double)phaseSwitches[j]->dist;
+                totalRecombFractionPerBP += recombFractionPerBP;
+            }
+        }
+      //  std::cout << "totalRecombFraction: " << totalRecombFraction << std::endl;
+        
+        double totalConcordantFraction = 0;
+        for (int j = 0; j != phaseConcordanceCoords.size(); j++) {
+            if(phaseConcordanceCoords[j][0] <= left && phaseConcordanceCoords[j][1] >= right){
+                coveringReadPairs++;
+                //double concordPairFraction = (double)distSNPs/(double)(phaseConcordanceCoords[j][2]);
+                totalConcordantFraction++;
+            }
+        }
+       // std::cout << "totalConcordantFraction: " << totalConcordantFraction << std::endl;
+        
+        if (coveringReadPairs > 10) {
+            recombFractions[i+1] = totalRecombFractionPerBP/totalConcordantFraction;
+        }
+        
+        numProcessedHets++;
+        if (numProcessedHets % 10000 == 0) {
+            std::cout << "numProcessedHets: " << numProcessedHets << " ("<< (double)numProcessedHets/coveredHetPos.size() << "%)"<< std::endl;
+            std::cout << "pos: " << left << "bp"<< std::endl;
+            
+        }
+        coveredHetEffectiveDepth.push_back(coveringReadPairs);
+    }
+    
+    *recombFile << "0\t" << coveredHetPos[0] << "\t" << recombFractions[0] << std::endl;
+    for (int i = 1; i != coveredHetPos.size(); i++) {
+        *recombFile << coveredHetPos[i-1] << "\t" << coveredHetPos[i] << "\t" << recombFractions[i] << std::endl;
+    }
+    
+    std::cout << std::endl;
+    std::cout << "6) Collecting stats... " << std::endl;
+    
+    // a) Prints out the distribition of recombination rates based on read pairs with variable-length inserts
+    collectRateStatsBasedOnInsertLength(phaseSwitches, phaseConcordanceCoords);
+    
+    int coverageDirectlyOnTheHet = 0;
+    for (int i = 0; i != coveredHetPos.size() - 1; i++) {
+        int thisHetPos = coveredHetPos[i];
+        for (int j = 0; j != phaseSwitches.size(); j++) {
+            if(phaseSwitches[j]->posLeft == thisHetPos || phaseSwitches[j]->posRight == thisHetPos){
+                coverageDirectlyOnTheHet++;
+            }
+        }
+        for (int j = 0; j != phaseConcordanceCoords.size(); j++) {
+            if(phaseConcordanceCoords[j][0] == thisHetPos || phaseConcordanceCoords[j][1] == thisHetPos){
+                coverageDirectlyOnTheHet++;
+            }
+        }
+        coveredHetDirectDepth.push_back(coverageDirectlyOnTheHet);
+        *depthFile << thisHetPos << "\t" << recombFractions[i] << "\t" << coveredHetEffectiveDepth[i] << "\t" << coverageDirectlyOnTheHet << std::endl;
     }
     
     return 0;
-    
 }
-
-
-
 
 void parseRecombFromSAMOptions(int argc, char** argv) {
     bool die = false;
