@@ -7,10 +7,10 @@ LDFLAGS=-lz
 all: $(BIN)/Hi-reComb
 
 $(BIN)/Hi-reComb: $(BIN) $(BIN)/generalUtils.o $(BIN)/recombFromInformativePairsSAM.o $(BIN)/findInformativePairs.o $(BIN)/recombUtils.o $(BIN)/Hi-reComb.o
-	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) $(BIN)/generalUtils.o $(BIN)/recombFromInformativePairsSAM.o $(BIN)/findInformativePairs.o $(BIN)/recombUtils.o $(BIN)/Hi-reComb.o -o $@ $(LDFLAGS)
 
 $(BIN)/%.o: %.cpp
-	$(CXX) -c $(CXXFLAGS) $(BIN)/generalUtils.o $(BIN)/recombFromInformativePairsSAM.o $(BIN)/findInformativePairs.o $(BIN)/recombUtils.o $(BIN)/Hi-reComb.o -o $@
+	$(CXX) -c $(CXXFLAGS) $< -o $@
 
 $(BIN):
 	mkdir -p $@
