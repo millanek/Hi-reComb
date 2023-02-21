@@ -29,6 +29,8 @@ std::vector<std::string> split(const std::string &s, char delim);
 std::vector<double> splitToDouble(const std::string &s, char delim);
 void splitToDouble(const std::string &s, char delim, std::vector<double> &elems);
 void split(const std::string &s, char delim, std::vector<std::string> &elems);
+void assertFileOpen(std::ifstream& fh, const std::string& fn);
+void assertFileOpen(std::ofstream& fh, const std::string& fn);
 
 template <class T> double vector_sum(T& vector) {
     double sum = 0;

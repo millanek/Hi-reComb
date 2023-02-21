@@ -42,3 +42,23 @@ double stringToDouble(std::string s) {
     ss >> d; //convert
     return d;
 }
+
+// Ensure a filehandle is open
+void assertFileOpen(std::ifstream& fh, const std::string& fn)
+{
+    if(!fh.is_open())
+    {
+        std::cerr << "Error: could not open " << fn << " for read\n";
+        exit(EXIT_FAILURE);
+    }
+}
+
+// Ensure a filehandle is open
+void assertFileOpen(std::ofstream& fh, const std::string& fn)
+{
+    if(!fh.is_open())
+    {
+        std::cerr << "Error: could not open " << fn << " for write\n";
+        exit(EXIT_FAILURE);
+    }
+}

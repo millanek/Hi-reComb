@@ -74,8 +74,8 @@ int RecombFromSAMMain(int argc, char** argv) {
     parseRecombFromSAMOptions(argc, argv);
     string line; // for reading the input files
     
-    std::ifstream* hetsFile = new std::ifstream(opt::hetsFile.c_str());
-    std::ifstream* samFile = new std::ifstream(opt::samFile.c_str());
+    std::ifstream* hetsFile = new std::ifstream(opt::hetsFile.c_str()); assertFileOpen(*hetsFile, opt::hetsFile);
+    std::ifstream* samFile = new std::ifstream(opt::samFile.c_str()); assertFileOpen(*samFile, opt::samFile);
     
     std::ofstream* phaseSwitchFile = new std::ofstream("switches" + opt::runName + ".txt");
     std::ofstream* recombFile = new std::ofstream("recombMap" + opt::runName + ".txt");
