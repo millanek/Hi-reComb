@@ -6,7 +6,7 @@ LDFLAGS=-lz
 
 all: $(BIN)/Hi-reComb
 
-$(BIN)/Hi-reComb: $(BIN)/generalUtils.o $(BIN)/recombFromInformativePairsSAM.o $(BIN)/findInformativePairs.o $(BIN)/recombUtils.o $(BIN)/Hi-reComb.o
+$(BIN)/Hi-reComb: $(BIN) $(BIN)/generalUtils.o $(BIN)/recombFromInformativePairsSAM.o $(BIN)/findInformativePairs.o $(BIN)/recombUtils.o $(BIN)/Hi-reComb.o
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
 $(BIN)/%.o: %.cpp
