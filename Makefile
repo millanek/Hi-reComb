@@ -12,10 +12,11 @@ $(BIN)/Hi-reComb: $(BIN)/generalUtils.o $(BIN)/recombFromInformativePairsSAM.o $
 $(BIN)/%.o: %.cpp
 	$(CXX) -c $(CXXFLAGS) $< -o $@
 
-#$(BIN):
-#	mkdir -p $@
+$(BIN):
+	mkdir -p $@
 
 # Dependencies
 $(BIN)/Hi-reComb: $(BIN)/generalUtils.o $(BIN)/recombFromInformativePairsSAM.o $(BIN)/findInformativePairs.o $(BIN)/recombUtils.o $(BIN)/Hi-reComb.o | $(BIN)
 
-
+clean:
+	rm $(BIN)/*.o $(BIN)/Hi-reComb

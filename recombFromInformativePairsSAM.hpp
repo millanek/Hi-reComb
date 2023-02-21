@@ -14,4 +14,6 @@
 void parseRecombFromSAMOptions(int argc, char** argv);
 int RecombFromSAMMain(int argc, char** argv);
 
+void collectRateStatsBasedOnInsertLength(const std::vector<PhaseSwitch*>& phaseSwitches, const std::vector<std::vector<int>>& phaseConcordanceCoords);
+
 #endif /* recombFromInformativePairsSAM_hpp */
