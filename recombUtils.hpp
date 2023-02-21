@@ -207,6 +207,34 @@ class RecombReadPair {
 
 };
 
+class AllPhaseInfo {
+    public:
+    AllPhaseInfo(string& hapcutFileName) {
+        std::ifstream* hapcutFile = new std::ifstream(hapcutFileName.c_str()); assertFileOpen(*hapcutFile, hapcutFileName);
+        
+        int blockNum = 0; string line;
+        // Parse the Hapcut blocks file
+        while (getline(*hapcutFile, line)) {
+            if (line[0] == '*') {
+            
+            } else if (line[0] == 'B' && line[1] == 'L') { // New block - should in the future separate the hets by blocks
+                blockNum++; phaseBlockSNPnums.push_back(0);
+            } else {
+                std::vector<string> phasedSNPdetails = split(line, '\t');
+                PhaseInfo* thisPhase = new PhaseInfo(phasedSNPdetails,blockNum);
+                if (thisPhase->valid) {
+                    posToPhase[thisPhase->pos] = thisPhase;
+                    phaseBlockSNPnums[blockNum-1]++;
+                }
+            }
+        }
+        hapcutFile->close();
+    }
+    
+    std::map<int,PhaseInfo*> posToPhase;
+    std::vector<int> phaseBlockSNPnums;
+};
+
 inline unsigned nChoosek( unsigned n, unsigned k )
 {
     if (k > n) return 0;

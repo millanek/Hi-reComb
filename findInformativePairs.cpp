@@ -54,7 +54,7 @@ static const struct option longopts[] = {
 
 namespace opt
 {
-    static string hetFile;
+    static string hetsFile;
     static bool hapcutFormat = false;
     static string runName = "";
     static int minMQ = 20;
@@ -67,54 +67,14 @@ int InfoReadsMain(int argc, char** argv) {
     parseInfoReadsOptions(argc, argv);
     string line; // for reading the input files
     
-    std::ifstream* hetFile = new std::ifstream(opt::hetFile.c_str());
     std::istream* samtoolsFile = &std::cin;
     
-    std::unordered_set<int> phasedHetsPos;
-    std::map<int,PhaseInfo*> positionToPhase;
     std::map<string,std::vector<string> > readNameToSamRecords;
     
     
-    if (opt::hapcutFormat) {
-        // Parse the Hapcut blocks file
-        while (getline(*hetFile, line)) {
-            if (line[0] == '*') {
-            
-            } else if (line[0] == 'B' && line[1] == 'L') { // New block - should in the future separate the hets by blocks
-                
-            } else {
-                std::vector<string> phasedSNPdetails = split(line, '\t');
-                int snpPos = atoi(phasedSNPdetails[4].c_str());
-                int H1phase = atoi(phasedSNPdetails[1].c_str());
-                int H2phase = atoi(phasedSNPdetails[2].c_str());
-                //std::cout << "line: " << line << std::endl;
-                // std::cout << "phasedSNPdetails[5]: " << phasedSNPdetails[5] << std::endl;
-                assert(phasedSNPdetails[5].length() == 1); assert(phasedSNPdetails[6].length() == 1);
-                char refBase = phasedSNPdetails[5][0];
-                char altBase = phasedSNPdetails[6][0];
-                double phaseQual = stringToDouble(phasedSNPdetails[10].c_str());
-                int snpCoverage = atoi(phasedSNPdetails[11].c_str());
-                std::vector<char> phasedVars;
-                if (H1phase == 0 && H2phase == 1) {
-                    phasedVars.push_back(refBase); phasedVars.push_back(altBase);
-                } else if (H1phase == 1 && H2phase == 0) {
-                    phasedVars.push_back(altBase); phasedVars.push_back(refBase);
-                } else{
-                    continue;
-                }
-                PhaseInfo* thisPhase = new PhaseInfo(snpPos,phaseQual,snpCoverage, phasedVars,1);
-                positionToPhase[snpPos] = thisPhase;
-            }
-        }
-    } else {
-        while (getline(*hetFile, line)) {
-            std::vector<string> phasedSNPdetails = split(line, '\t');
-            int snpPos = atoi(phasedSNPdetails[1].c_str());
-            phasedHetsPos.insert(snpPos);
-        }
-    }
+    AllPhaseInfo* p = new AllPhaseInfo(opt::hetsFile);
     
-    std::cerr << "Finished reading het sites. There are " << positionToPhase.size() << " hets." << std::endl;
+    std::cerr << "Finished reading het sites. There are " << p->posToPhase.size() << " hets." << std::endl;
     std::cerr << "Processing reads:" << std::endl;
     
     int readsProcessed = 0;
@@ -135,7 +95,7 @@ int InfoReadsMain(int argc, char** argv) {
         
         RecombRead* thisRead = new RecombRead(samRecVec);
         
-        thisRead->findHetsInRead(positionToPhase);
+        thisRead->findHetsInRead(p->posToPhase);
         
         if (thisRead->hetSites.size() > 0) {
             readNameToSamRecords[thisRead->readName].push_back(line);
@@ -189,5 +149,5 @@ void parseInfoReadsOptions(int argc, char** argv) {
     }
     
     // Parse the input filenames
-    opt::hetFile = argv[optind++];
+    opt::hetsFile = argv[optind++];
 }
