@@ -7,7 +7,7 @@
 
 #include "recombUtils.hpp"
 
-void RecombRead::findHetsInMatchingString(const string& matchSeq, int startPos, const std::map<int,PhaseInfo*>& positionToPhase) {
+void RecombRead::findHetsInMatchingString(const string& matchSeq, const int startPos, const std::map<int,PhaseInfo*>& positionToPhase) {
     for (int i = 0; i < matchSeq.length(); i++) {
         if (positionToPhase.count(startPos + i) == 1) {
             PhaseInfo* thisHetPhase = positionToPhase.at(startPos + i);

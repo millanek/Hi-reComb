@@ -38,6 +38,7 @@ class RecombReadPairs {
         }
     };
     
+    // Read Pairs
     std::vector<RecombReadPair*> readPairs;
     std::vector<RecombReadPair*> informativeReadPairs;
     
@@ -48,17 +49,39 @@ class RecombReadPairs {
     // Base quality stats
     int numMatch = 0; int numMismatch = 0;
     std::vector<double> matchBaseScores; std::vector<double> mismatchBaseScores;
+//    std::vector<double> concordantBaseScores; std::vector<double> discordantBaseScores;
     
     // Recombination stats
     int numConcordant = 0; int numDiscordant = 0;
     long long int totalEffectiveLength = 0;
+    std::vector<PhaseSwitch*> phaseSwitches; std::vector<std::vector<int>> phaseConcordanceCoords;
     
+    // Records about recombination-informative het sites
+    std::vector<int> coveredHetPos;
+    std::vector<int> coveredHetEffectiveDepth; std::vector<int> coveredHetDirectDepth;
     
     void linkWithHets(std::map<int,PhaseInfo*>& posToPhase, int minBQ) {
         for (int i = 0; i < readPairs.size(); i++) {
             RecombReadPair* thisReadPair = readPairs[i];
             thisReadPair->findAndCombinePairHets(posToPhase);
             thisReadPair->filterHetsByQuality(minBQ);
+            
+            // Check if het-bases in the reads match the genotype calls from the VCF/hapcut2 file
+            std::vector<HetInfo*>::iterator it = thisReadPair->hetSites.begin();
+            while(it != thisReadPair->hetSites.end()) {
+                HetInfo* thisHet = *it;
+                if (thisHet->readPhaseBaseMismatch) {
+                    numMismatch++;
+                    mismatchBaseScores.push_back(thisHet->thisBaseQuality);
+                    it = thisReadPair->hetSites.erase(it);
+                } else {
+                    // std::cout << "Fine: " << std::endl;
+                    matchBaseScores.push_back(thisHet->thisBaseQuality);
+                    numMatch++;
+                    coveredHetPos.push_back(thisHet->pos);
+                    ++it;
+                }
+            }
             
             // Collecting stats
             if (thisReadPair->hetSites.size() == 0) num0het++;
@@ -82,20 +105,21 @@ class RecombReadPairs {
         }
     }
     
-    void printReadPairStats() {
+    
+    void printBaseQualityStats() {
         std::cout << "Initial Read Pairs.size(): " << readPairs.size() << std::endl;
+        std::cout << "numMatch: " << numMatch << std::endl;
+        std::cout << "numMismatch: " << numMismatch << std::endl;
+        std::cout << "Mean mismatchBaseScores: " << vector_average(mismatchBaseScores) << std::endl;
+        std::cout << "Mean matchBaseScores: " << vector_average(matchBaseScores) << std::endl;
+    }
+    
+    void printReadPairStats() {
         std::cout << "num0het: " << num0het << std::endl;
         std::cout << "num1het: " << num1het << std::endl;
         std::cout << "num2plusHets: " << num2plusHets << std::endl;
         std::cout << "informativeReadPairs.size(): " << informativeReadPairs.size() << std::endl;
         std::cout << std::endl;
-    }
-    
-    void printBaseQualityStats() {
-        std::cout << "numMatch: " << numMatch << std::endl;
-        std::cout << "numMismatch: " << numMismatch << std::endl;
-        std::cout << "Mean mismatchBaseScores: " << vector_average(mismatchBaseScores) << std::endl;
-        std::cout << "Mean matchBaseScores: " << vector_average(matchBaseScores) << std::endl;
     }
     
     void printRecombinationBaseStats() {

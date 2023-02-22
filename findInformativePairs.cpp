@@ -71,7 +71,6 @@ int InfoReadsMain(int argc, char** argv) {
     
     std::map<string,std::vector<string> > readNameToSamRecords;
     
-    
     AllPhaseInfo* p = new AllPhaseInfo(opt::hetsFile);
     
     std::cerr << "Finished reading het sites. There are " << p->posToPhase.size() << " hets." << std::endl;

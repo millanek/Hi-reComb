@@ -62,11 +62,10 @@ class PhaseInfo {
     public:
     PhaseInfo() {};
     
-    PhaseInfo(std::vector<string>& phasedSNPdetails, int blockNumIn) {
+    PhaseInfo(std::vector<string>& phasedSNPdetails, int blockNumIn): valid(false) {
         int H1phase = atoi(phasedSNPdetails[1].c_str()); int H2phase = atoi(phasedSNPdetails[2].c_str());
         assert(phasedSNPdetails[5].length() == 1); assert(phasedSNPdetails[6].length() == 1);
         char refBase = phasedSNPdetails[5][0]; char altBase = phasedSNPdetails[6][0];
-        std::vector<char> phasedVars;
         if (H1phase == 0 && H2phase == 1) {
             phasedVars.push_back(refBase); phasedVars.push_back(altBase); valid = true;
         } else if (H1phase == 1 && H2phase == 0) {
@@ -82,7 +81,7 @@ class PhaseInfo {
     double quality;
     int coverage;
     int blockNum;
-    bool valid = false;
+    bool valid;
     
 };
 
@@ -145,7 +144,7 @@ class RecombRead {
     private:
         string assignStrandFromFlag();
         void generateCIGARvectors();
-        void findHetsInMatchingString(const string& matchSeq, int startPos, const std::map<int,PhaseInfo*>& positionToPhase);
+        void findHetsInMatchingString(const string& matchSeq, const int startPos, const std::map<int,PhaseInfo*>& positionToPhase);
 
 };
 
