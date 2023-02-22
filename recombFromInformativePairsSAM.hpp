@@ -14,10 +14,10 @@
 void parseRecombFromSAMOptions(int argc, char** argv);
 int RecombFromSAMMain(int argc, char** argv);
 
-void collectRateStatsBasedOnInsertLength(const std::vector<PhaseSwitch*>& phaseSwitches, const std::vector<std::vector<int>>& phaseConcordanceCoords);
+void collectRateStatsBasedOnInsertLength(const std::vector<DefiningRecombInfo*>& phaseSwitches, const std::vector<DefiningRecombInfo*>& phaseConcordanceCoords);
 
 class RecombReadPairs {
-    public:
+public:
     // Parse the samtools file to find reads that match records from the pairstools file
     // and therefore  can be informative about the phasing and recombination
     RecombReadPairs(string readFileName) {
@@ -42,10 +42,6 @@ class RecombReadPairs {
     std::vector<RecombReadPair*> readPairs;
     std::vector<RecombReadPair*> informativeReadPairs;
     
-    // linking stats
-    int num0het = 0; int num1het = 0; int num2plusHets = 0;
-    int totalUsedReadLengthBp = 0;
-    
     // Base quality stats
     int numMatch = 0; int numMismatch = 0;
     std::vector<double> matchBaseScores; std::vector<double> mismatchBaseScores;
@@ -54,7 +50,9 @@ class RecombReadPairs {
     // Recombination stats
     int numConcordant = 0; int numDiscordant = 0;
     long long int totalEffectiveLength = 0;
-    std::vector<PhaseSwitch*> phaseSwitches; std::vector<std::vector<int>> phaseConcordanceCoords;
+    // Details about discordant read pairs to output by the printSwitchInfoIntoFile() method
+    std::vector<DefiningRecombInfo*> phaseSwitches;
+    std::vector<DefiningRecombInfo*> concordantPairs;
     
     // Records about recombination-informative het sites
     std::vector<int> coveredHetPos;
@@ -67,28 +65,13 @@ class RecombReadPairs {
             thisReadPair->filterHetsByQuality(minBQ);
             
             // Check if het-bases in the reads match the genotype calls from the VCF/hapcut2 file
-            std::vector<HetInfo*>::iterator it = thisReadPair->hetSites.begin();
-            while(it != thisReadPair->hetSites.end()) {
-                HetInfo* thisHet = *it;
-                if (thisHet->readPhaseBaseMismatch) {
-                    numMismatch++;
-                    mismatchBaseScores.push_back(thisHet->thisBaseQuality);
-                    it = thisReadPair->hetSites.erase(it);
-                } else {
-                    // std::cout << "Fine: " << std::endl;
-                    matchBaseScores.push_back(thisHet->thisBaseQuality);
-                    numMatch++;
-                    coveredHetPos.push_back(thisHet->pos);
-                    ++it;
-                }
-            }
+            categoriseBaseMatchMismatch(thisReadPair);
             
-            // Collecting stats
-            if (thisReadPair->hetSites.size() == 0) num0het++;
-            else if (thisReadPair->hetSites.size() == 1) num1het++;
-            else num2plusHets++;
+            // Find the number of informative heterozygous sites on this read-pair
+            collectHetNumStats(thisReadPair);
             
-            // Check if pairs of hets are in the same phase-block
+            // Check if there is a pair of hets on the two reads belonging to the same phase-block
+            // If yes, the read-pair is then categorised as phase-informative
             if (thisReadPair->hetSites.size() > 1) {
                 thisReadPair->read1->linkHetsWithPhaseBlock();
                 thisReadPair->read2->linkHetsWithPhaseBlock();
@@ -102,6 +85,13 @@ class RecombReadPairs {
                 }
             }
             
+        }
+    }
+    
+    void printSwitchInfoIntoFile(string fileName) {
+        std::ofstream* phaseSwitchFile = new std::ofstream(fileName);
+        for (int i = 0; i != phaseSwitches.size(); i++) {
+            *phaseSwitchFile << phaseSwitches[i]->posLeft << "\t" << phaseSwitches[i]->posRight << "\t" << phaseSwitches[i]->dist << "\t" << phaseSwitches[i]->phaseQualLeft << "\t" << phaseSwitches[i]->phaseQualRight << std::endl;
         }
     }
     
@@ -122,10 +112,39 @@ class RecombReadPairs {
         std::cout << std::endl;
     }
     
-    void printRecombinationBaseStats() {
+    void printConcordDiscordStats() {
         std::cout << "Effective coverage (bp): " << totalEffectiveLength << std::endl;
         std::cout << "numConcordant: " << numConcordant << std::endl;
         std::cout << "numDiscordant: " << numDiscordant << std::endl;
+    }
+    
+private:
+    // linking stats
+    int num0het = 0; int num1het = 0; int num2plusHets = 0;
+    int totalUsedReadLengthBp = 0;
+    
+    void categoriseBaseMatchMismatch(RecombReadPair* thisReadPair) {
+        std::vector<HetInfo*>::iterator it = thisReadPair->hetSites.begin();
+        while(it != thisReadPair->hetSites.end()) {
+            HetInfo* thisHet = *it;
+            if (thisHet->readPhaseBaseMismatch) {
+                numMismatch++;
+                mismatchBaseScores.push_back(thisHet->thisBaseQuality);
+                it = thisReadPair->hetSites.erase(it);
+            } else {
+                // std::cout << "Fine: " << std::endl;
+                matchBaseScores.push_back(thisHet->thisBaseQuality);
+                numMatch++;
+                coveredHetPos.push_back(thisHet->pos);
+                ++it;
+            }
+        }
+    }
+    
+    void collectHetNumStats(RecombReadPair* thisReadPair) {
+        if (thisReadPair->hetSites.size() == 0) num0het++;
+        else if (thisReadPair->hetSites.size() == 1) num1het++;
+        else num2plusHets++;
     }
     
 };

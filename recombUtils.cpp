@@ -138,3 +138,68 @@ void RecombReadPair::filterHetsByBlock(int blockNum) {
     }
     hetSites = goodHets;
 }
+
+void RecombReadPair::findIndicesOfConcordantAndDiscordantPairsOfHets(const int minDistance) {
+    for (int i = 0; i < hetSites.size() - 1; i++) {
+        for (int j = 1; j < hetSites.size(); j++) {
+            if (hetSites[i]->phaseBlock == hetSites[j]->phaseBlock) {
+                int phaseI = hetSites[i]->thisHetPhase01;
+                int phaseJ = hetSites[j]->thisHetPhase01;
+                int iPos = hetSites[i]->pos;
+                int jPos = hetSites[j]->pos;
+                if(abs(jPos - iPos) > minDistance) {
+                    if (phaseI != phaseJ) {
+                        switchPairI.push_back(i); switchPairJ.push_back(j);
+                    } else {
+                        concordPairI.push_back(i); concordPairJ.push_back(j);
+                    }
+                }
+            }
+        }
+    }
+}
+
+void RecombReadPair::determineIfReadPairConcordantOrDiscordant() {
+    if (switchPairI.size() > 0 && concordPairI.size() == 0)
+        pairRecombinationStatus = PAIR_DISCORDANT;
+    else if (concordPairI.size() > 0 && switchPairI.size() == 0)
+        pairRecombinationStatus = PAIR_CONCORDANT;
+    else
+        pairRecombinationStatus = PAIR_AMBIGUOUS;
+}
+
+DefiningRecombInfo* RecombReadPair::getDefiningHetPair(const std::vector<int>& indicesI, const std::vector<int>& indicesJ) {
+    int maxD = 0; int maxDindex = 0;
+    int minD = 1000000000; int minDindex = 0;
+    for (int i = 0; i != indicesI.size(); i++) {
+        int iPos = hetSites[indicesI[0]]->pos;
+        int jPos = hetSites[indicesJ[0]]->pos;
+        
+        if (abs(jPos - iPos) > maxD) maxDindex = i;
+        if (abs(jPos - iPos) < minD) minDindex = i;
+    }
+    
+    DefiningRecombInfo* thisRecombInfo;
+    if (pairRecombinationStatus == PAIR_CONCORDANT) {
+        thisRecombInfo = getHetPairByIndex(indicesI, indicesJ, maxDindex);
+    } else if (pairRecombinationStatus == PAIR_DISCORDANT) {
+        thisRecombInfo = getHetPairByIndex(indicesI, indicesJ, minDindex);
+    } else {
+        assert(false);
+    }
+    return thisRecombInfo;
+}
+
+DefiningRecombInfo* RecombReadPair::getHetPairByIndex(const std::vector<int>& indicesI, const std::vector<int>& indicesJ, const int index) {
+    int iPos = hetSites[indicesI[index]]->pos;
+    int jPos = hetSites[indicesJ[index]]->pos;
+    int iQual = hetSites[indicesI[index]]->thisPhaseQuality;
+    int jQual = hetSites[indicesJ[index]]->thisPhaseQuality;
+    
+    if (jPos - iPos < 0) {
+        int tmp = iPos; iPos = jPos; jPos = tmp;
+        tmp = iQual; iQual = jQual; jQual = tmp;
+    }
+    DefiningRecombInfo* thisRecombInfo = new DefiningRecombInfo(iPos, jPos, iQual, jQual);
+    return thisRecombInfo;
+}

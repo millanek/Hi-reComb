@@ -18,6 +18,10 @@
 #define INSERTION_CIGAR 'I'
 #define DELETION_CIGAR 'D'
 
+#define PAIR_CONCORDANT 0
+#define PAIR_DISCORDANT 1
+#define PAIR_AMBIGUOUS 2
+
 class HetInfo {
     public:
     HetInfo(int position, char readBase, int readBaseQuality, char phase0, char phase1, double phaseQuality, int phaseBlockIn) {
@@ -150,14 +154,14 @@ class RecombRead {
 
 
 
-class PhaseSwitch {
+class DefiningRecombInfo {
     public:
-    PhaseSwitch(int left, int right, double qLeft, double qRight) {
+    DefiningRecombInfo(int left, int right, double qLeft, double qRight) {
         posLeft = left;
         posRight = right;
         phaseQualLeft = qLeft;
         phaseQualRight = qRight;
-        dist = abs(right - left);
+        dist = abs(right - left) + 1;
     };
     
     int posLeft;
@@ -194,16 +198,26 @@ class RecombReadPair {
     RecombRead* read2;
     
     int pairSpan;
-    bool pairDiscordant;
+    int pairRecombinationStatus;
     std::vector<HetInfo*> hetSites;
+    
+    std::vector<int> switchPairI; std::vector<int> switchPairJ;
+    std::vector<int> concordPairI; std::vector<int> concordPairJ;
+    
+    
     //std::map<int,std::vector<int>> BlockIDsToHetPos;
     //std::map<int> HetPosToBlockIDs;
     
     void findAndCombinePairHets(const std::map<int,PhaseInfo*> & positionToPhase);
     void filterHetsByQuality(int minQuality);
     void filterHetsByBlock(int blockNum);
+    void findIndicesOfConcordantAndDiscordantPairsOfHets(const int minDistance);
+    void determineIfReadPairConcordantOrDiscordant();
+    DefiningRecombInfo* getDefiningHetPair(const std::vector<int>& indicesI, const std::vector<int>& indicesJ);
     
-
+private:
+    DefiningRecombInfo* getHetPairByIndex(const std::vector<int>& indicesI, const std::vector<int>& indicesJ, const int index);
+    
 };
 
 class AllPhaseInfo {
