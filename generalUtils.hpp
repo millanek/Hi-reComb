@@ -18,6 +18,7 @@
 #include <getopt.h>
 #include <assert.h>
 #include <algorithm>
+#include <random>
 
 using std::string;
 #define PROGRAM_BIN "Hi-reComb"

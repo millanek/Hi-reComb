@@ -53,6 +53,7 @@ public:
     // Details about discordant read pairs to output by the printSwitchInfoIntoFile() method
     std::vector<DefiningRecombInfo*> phaseSwitches;
     std::vector<DefiningRecombInfo*> concordantPairs;
+    std::vector<DefiningRecombInfo*> allInformativePairs;
     
     // Records about recombination-informative het sites
     std::vector<int> coveredHetPos;
@@ -118,6 +119,27 @@ public:
         std::cout << "numDiscordant: " << numDiscordant << std::endl;
     }
     
+    void findUniqueHetsCoveredByReadsAndSortThem() {
+        std::sort(coveredHetPos.begin(), coveredHetPos.end());
+        std::vector<int>::iterator it = std::unique(coveredHetPos.begin(), coveredHetPos.end());
+        coveredHetPos.resize(distance(coveredHetPos.begin(),it));
+        std::cout << "coveredHetPos.size() " << coveredHetPos.size() << std::endl;
+    }
+    
+    std::vector<DefiningRecombInfo*> getBootstrapSample() {
+        std::random_device rd; // obtain a random number from hardware
+        std::mt19937 gen(rd()); // seed the generator
+        std::uniform_int_distribution<> distr(0, (int)allInformativePairs.size() - 1); // define the range
+        
+        std::vector<DefiningRecombInfo*> bootstrapSample(allInformativePairs.size());
+        for (int i = 0; i < allInformativePairs.size(); i++) {
+            int s = distr(gen);
+            bootstrapSample[i] = allInformativePairs[s];
+        }
+        return bootstrapSample;
+    }
+    
+    
 private:
     // linking stats
     int num0het = 0; int num1het = 0; int num2plusHets = 0;
@@ -149,5 +171,37 @@ private:
     
 };
 
+class RecombInterval {
+public:
+    RecombInterval(): totalRecombFractionPerBP(0), totalConcordantFraction(0),coveringReadPairs(0) {
+        
+    };
+    
+    double recombFraction;
+    int coveringReadPairs;
+    
+private:
+    double totalRecombFractionPerBP;
+    double totalConcordantFraction;
+};
+
+
+class RecombMap {
+public:
+    RecombMap(RecombReadPairs* rp) {
+        // Get the mean recombination rate per bp
+        meanRate = (double)rp->numDiscordant/(double)rp->totalEffectiveLength;
+        std::cout << "meanRecombinationRate " << meanRate << std::endl;
+        
+        // Initialise the recombination fractions assuming a uniform recombination rate along the genome (this uses the per-bp rate)
+        std::vector<double> rF(rp->coveredHetPos.size() - 1, meanRate); recombFractions = rF;
+    }; 
+    
+    double meanRate;
+    std::vector<double> recombFractions;
+    
+    
+
+};
 
 #endif /* recombFromInformativePairsSAM_hpp */

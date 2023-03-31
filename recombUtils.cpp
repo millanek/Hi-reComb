@@ -200,6 +200,11 @@ DefiningRecombInfo* RecombReadPair::getHetPairByIndex(const std::vector<int>& in
         int tmp = iPos; iPos = jPos; jPos = tmp;
         tmp = iQual; iQual = jQual; jQual = tmp;
     }
-    DefiningRecombInfo* thisRecombInfo = new DefiningRecombInfo(iPos, jPos, iQual, jQual);
+    DefiningRecombInfo* thisRecombInfo;
+    if (pairRecombinationStatus == PAIR_CONCORDANT) {
+        thisRecombInfo = new DefiningRecombInfo(iPos, jPos, iQual, jQual,false);
+    } else {
+        thisRecombInfo = new DefiningRecombInfo(iPos, jPos, iQual, jQual,true);
+    }
     return thisRecombInfo;
 }

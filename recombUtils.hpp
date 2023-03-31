@@ -156,12 +156,13 @@ class RecombRead {
 
 class DefiningRecombInfo {
     public:
-    DefiningRecombInfo(int left, int right, double qLeft, double qRight) {
+    DefiningRecombInfo(int left, int right, double qLeft, double qRight, bool isSwitch) {
         posLeft = left;
         posRight = right;
         phaseQualLeft = qLeft;
         phaseQualRight = qRight;
         dist = abs(right - left) + 1;
+        isRecombined = isSwitch;
     };
     
     int posLeft;
@@ -169,8 +170,7 @@ class DefiningRecombInfo {
     double phaseQualLeft;
     double phaseQualRight;
     int dist;
-    
-
+    bool isRecombined;
 };
 
 
@@ -222,20 +222,29 @@ private:
 
 class AllPhaseInfo {
     public:
-    AllPhaseInfo(string& hapcutFileName) {
-        std::ifstream* hapcutFile = new std::ifstream(hapcutFileName.c_str()); assertFileOpen(*hapcutFile, hapcutFileName);
+    AllPhaseInfo(const string& hapcutFileName, int minPhaseQual, string subsetFileName = "") {
+        string line;
         
-        int blockNum = 0; string line;
+        std::ifstream* hapcutFile = new std::ifstream(hapcutFileName.c_str()); assertFileOpen(*hapcutFile, hapcutFileName);
+        std::map <int, bool> subsetLoci;
+        if (!subsetFileName.empty()) {
+            std::ifstream* subsetFile = new std::ifstream(subsetFileName.c_str()); assertFileOpen(*subsetFile, subsetFileName);
+            while (getline(*subsetFile, line)) {
+                subsetLoci[atoi(line.c_str())] = true;
+            }
+        }
+        int blockNum = 0;
         // Parse the Hapcut blocks file
         while (getline(*hapcutFile, line)) {
             if (line[0] == '*') {
             
-            } else if (line[0] == 'B' && line[1] == 'L') { // New block - should in the future separate the hets by blocks
+            } else if (line[0] == 'B' && line[1] == 'L') { // New block - separating the hets by blocks
                 blockNum++; phaseBlockSNPnums.push_back(0);
             } else {
                 std::vector<string> phasedSNPdetails = split(line, '\t');
                 PhaseInfo* thisPhase = new PhaseInfo(phasedSNPdetails,blockNum);
-                if (thisPhase->valid) {
+                if (thisPhase->valid && thisPhase->coverage > 2 && (subsetLoci.size() == 0 || subsetLoci.count(thisPhase->pos) == 0)
+                    && thisPhase->quality >= minPhaseQual) {
                     posToPhase[thisPhase->pos] = thisPhase;
                     phaseBlockSNPnums[blockNum-1]++;
                 }

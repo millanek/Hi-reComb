@@ -32,17 +32,16 @@ static const char *DISCORDPAIRS_USAGE_MESSAGE =
 "       -n, --run-name                          run-name will be included in the output file name\n"
 "       -m, --min-MQ                            (default: 20) the minimum mapping quality for a read to be considered\n"
 "       -b, --min-BQ                            (default: 30) the minimum base quality for assesssing discordant phase\n"
-"       -d, --min-Dist                          (default: 500) the minimum distance (bp) to consider discordant phase a recombination\n"
+"       -d, --min-Dist                          (default: 1000) the minimum distance (bp) to consider discordant phase a recombination\n"
 "                                               as opposed to gene conversion\n"
-"       -p, --min-PQ                            (default: 30) the minimum phase quality for assesssing discordant phase (relevant with the --hapCut option)\n"
-"       --hapCut                                the het positions come from HapCut output\n"
+"       -p, --min-PQ                            (default: 0) the minimum phase quality for assesssing discordant phase\n"
+"       -s, --subsetHets=FILE.txt               (optional) Exclude the sites specified in this file\n"
 "\n"
 "\nReport bugs to " PACKAGE_BUGREPORT "\n\n";
 
-static const char* shortopts = "hn:b:m:p:d:";
+static const char* shortopts = "hn:b:m:p:d:s:";
 
 //enum { OPT_ANNOT, OPT_AF  };
-enum { OPT_HAPCUT  };
 
 static const struct option longopts[] = {
     { "help",   no_argument, NULL, 'h' },
@@ -51,20 +50,20 @@ static const struct option longopts[] = {
     { "min-BQ",   required_argument, NULL, 'b' },
     { "min-PQ",   required_argument, NULL, 'p' },
     { "min-Dist",   required_argument, NULL, 'd' },
-    { "hapCut",   no_argument, NULL, OPT_HAPCUT },
+    { "subsetHets",   required_argument, NULL, 's' },
     { NULL, 0, NULL, 0 }
 };
 
 namespace opt
 {
-    static bool hapcutFormat = false;
     static string hetsFile;
     static string samFile;
     static string runName = "";
     static int minMQ = 20;
     static int minBQ = 30;
-    static int minPQ = 30;
-    static int minDist = 500;
+    static int minPQ = 0;
+    static int minDist = 1000;
+    static string hetsSubset;
 }
 
 int RecombFromSAMMain(int argc, char** argv) {
@@ -75,13 +74,13 @@ int RecombFromSAMMain(int argc, char** argv) {
     std::ofstream* depthFile = new std::ofstream("recombMap_wDepth" + opt::runName + ".txt");
     
     std::cout << "1) Processing hets..." << std::endl;
-    AllPhaseInfo* p = new AllPhaseInfo(opt::hetsFile);
-    
+    AllPhaseInfo* p = new AllPhaseInfo(opt::hetsFile, opt::minPQ, opt::hetsSubset);
     std::cout << std::endl;
+    
     std::cout << "2) Loading read-pairs... " << std::endl;
     RecombReadPairs* rp = new RecombReadPairs(opt::samFile);
-    
     std::cout << std::endl;
+    
     std::cout << "3) Linking read-pairs and phased hets... " << std::endl;
     rp->linkWithHets(p->posToPhase, opt::minBQ);
     rp->printBaseQualityStats();
@@ -92,7 +91,7 @@ int RecombFromSAMMain(int argc, char** argv) {
     // Prod_i ((1-Z_i)(G(y_i)-G(x_i)) + Z_i*(1 -(G(y_i)-G(x_i))
     
     // std::vector<PhaseSwitch*> thisPairSwitches;
-    int readPairsProcessed = 0;
+    int readPairsProcessed = 0; DefiningRecombInfo* thisPairInformation;
     for (std::vector<RecombReadPair*>::iterator it = rp->informativeReadPairs.begin(); it != rp->informativeReadPairs.end(); it++) {
         readPairsProcessed++;
         RecombReadPair* thisReadPair = *it;
@@ -102,63 +101,52 @@ int RecombFromSAMMain(int argc, char** argv) {
         
         if (thisReadPair->pairRecombinationStatus == PAIR_DISCORDANT) {
             rp->numDiscordant++;
-            DefiningRecombInfo* thisSwitch = thisReadPair->getDefiningHetPair(thisReadPair->switchPairI, thisReadPair->switchPairJ);
-            rp->phaseSwitches.push_back(thisSwitch);
-            rp->totalEffectiveLength = rp->totalEffectiveLength + thisSwitch->dist;
+            thisPairInformation = thisReadPair->getDefiningHetPair(thisReadPair->switchPairI, thisReadPair->switchPairJ);
+            rp->phaseSwitches.push_back(thisPairInformation);
         } else if (thisReadPair->pairRecombinationStatus == PAIR_CONCORDANT) {
             rp->numConcordant++;
-            DefiningRecombInfo* thisConcordantInfo = thisReadPair->getDefiningHetPair(thisReadPair->concordPairI, thisReadPair->concordPairJ);
-            rp->concordantPairs.push_back(thisConcordantInfo);
-            rp->totalEffectiveLength = rp->totalEffectiveLength + thisConcordantInfo->dist;
+            thisPairInformation = thisReadPair->getDefiningHetPair(thisReadPair->concordPairI, thisReadPair->concordPairJ);
+            rp->concordantPairs.push_back(thisPairInformation);
         }
-        
+        if (thisReadPair->pairRecombinationStatus != PAIR_AMBIGUOUS) {
+            rp->allInformativePairs.push_back(thisPairInformation);
+            rp->totalEffectiveLength = rp->totalEffectiveLength + thisPairInformation->dist;
+        }
     }
-    
     rp->printConcordDiscordStats();
     rp->printSwitchInfoIntoFile("switches" + opt::runName + ".txt");
-    
     std::cout << std::endl;
+    
+    
+    
     std::cout << "5) Making a genetic map... " << std::endl;
-    std::sort(rp->coveredHetPos.begin(), rp->coveredHetPos.end());
-    std::vector<int>::iterator it = std::unique(rp->coveredHetPos.begin(), rp->coveredHetPos.end());
-    rp->coveredHetPos.resize(distance(rp->coveredHetPos.begin(),it));
-    std::cout << "coveredHetPos.size() " << rp->coveredHetPos.size() << std::endl;
+    rp->findUniqueHetsCoveredByReadsAndSortThem(); // Find and sort informative SNPs
     
-    double meanRecombinationRate = (double)rp->numDiscordant/(double)rp->totalEffectiveLength;
-    std::cout << "meanRecombinationRate " << meanRecombinationRate << std::endl;
-    std::vector<double> recombFractions(rp->coveredHetPos.size()+1, meanRecombinationRate);
+    RecombMap* rm = new RecombMap(rp);
     
+    // Now do the calculation - roughly corresponds to one iteration of the EM algorithm
     int numProcessedHets = 0;
-    for (int i = 0; i != rp->coveredHetPos.size() - 1; i++) {
+    for (int i = 0; i < rm->recombFractions.size(); i++) {
         int left = rp->coveredHetPos[i];
         int right = rp->coveredHetPos[i + 1];
         //int distSNPs = (right - left) + 1;
         
-        int coveringReadPairs = 0;
+        int coveringReadPairs = 0; double totalRecombFractionPerBP = 0; double totalConcordantFraction = 0;
         
-        double totalRecombFractionPerBP = 0;
-        for (int j = 0; j != rp->phaseSwitches.size(); j++) {
-            if(rp->phaseSwitches[j]->posLeft <= left && rp->phaseSwitches[j]->posRight >= right){
+        for (int j = 0; j != rp->allInformativePairs.size(); j++) {
+            if(rp->allInformativePairs[j]->posLeft <= left && rp->allInformativePairs[j]->posRight >= right){
                 coveringReadPairs++;
-                double recombFractionPerBP = (double)1.0/(double)rp->phaseSwitches[j]->dist;
-                totalRecombFractionPerBP += recombFractionPerBP;
-            }
-        }
-      //  std::cout << "totalRecombFraction: " << totalRecombFraction << std::endl;
-        
-        double totalConcordantFraction = 0;
-        for (int j = 0; j != rp->concordantPairs.size(); j++) {
-            if(rp->concordantPairs[j]->posLeft <= left && rp->concordantPairs[j]->posRight >= right){
-                coveringReadPairs++;
-                //double concordPairFraction = (double)distSNPs/(double)(phaseConcordanceCoords[j][2]);
-                totalConcordantFraction++;
+                if (rp->allInformativePairs[j]->isRecombined) {
+                    double recombFractionPerBP = (double)1.0/(double)rp->allInformativePairs[j]->dist;
+                    totalRecombFractionPerBP += recombFractionPerBP;
+                } else {
+                    totalConcordantFraction++;
+                }
             }
         }
        // std::cout << "totalConcordantFraction: " << totalConcordantFraction << std::endl;
         
-        if (coveringReadPairs > 10) {
-            recombFractions[i+1] = totalRecombFractionPerBP/totalConcordantFraction;
-        }
+        if (coveringReadPairs > 10) rm->recombFractions[i+1] = totalRecombFractionPerBP/totalConcordantFraction;
         
         numProcessedHets++;
         if (numProcessedHets % 10000 == 0) {
@@ -169,12 +157,14 @@ int RecombFromSAMMain(int argc, char** argv) {
         rp->coveredHetEffectiveDepth.push_back(coveringReadPairs);
     }
     
-    *recombFile << "0\t" << rp->coveredHetPos[0] << "\t" << recombFractions[0] << std::endl;
-    for (int i = 1; i != rp->coveredHetPos.size(); i++) {
-        *recombFile << rp->coveredHetPos[i-1] << "\t" << rp->coveredHetPos[i] << "\t" << recombFractions[i] << std::endl;
+    // That's just approximating the chromosome beginning; do we want it?
+    *recombFile << "0\t" << rp->coveredHetPos[0] << "\t" << rm->recombFractions[0] << std::endl;
+    // Now the actual map
+    for (int i = 0; i != rm->recombFractions.size(); i++) {
+        *recombFile << rp->coveredHetPos[i] << "\t" << rp->coveredHetPos[i + 1] << "\t" << rm->recombFractions[i] << std::endl;
     }
-    
     std::cout << std::endl;
+    
     std::cout << "6) Collecting stats... " << std::endl;
     
     // a) Prints out the distribition of recombination rates based on read pairs with variable-length inserts
@@ -194,7 +184,7 @@ int RecombFromSAMMain(int argc, char** argv) {
             }
         }
         rp->coveredHetDirectDepth.push_back(coverageDirectlyOnTheHet);
-        *depthFile << thisHetPos << "\t" << recombFractions[i] << "\t" << rp->coveredHetEffectiveDepth[i] << "\t" << coverageDirectlyOnTheHet << std::endl;
+        *depthFile << thisHetPos << "\t" << rm->recombFractions[i] << "\t" << rp->coveredHetEffectiveDepth[i] << "\t" << coverageDirectlyOnTheHet << std::endl;
     }
     
     return 0;
@@ -212,7 +202,8 @@ void parseRecombFromSAMOptions(int argc, char** argv) {
             case 'b': arg >> opt::minBQ; break;
             case 'm': arg >> opt::minMQ; break;
             case 'd': arg >> opt::minDist; break;
-            case OPT_HAPCUT: opt::hapcutFormat = true; break;
+            case 'p': arg >> opt::minPQ; break;
+            case 's': arg >> opt::hetsSubset; break;
             case 'h':
                 std::cout << DISCORDPAIRS_USAGE_MESSAGE;
                 exit(EXIT_SUCCESS);
