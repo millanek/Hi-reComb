@@ -121,47 +121,29 @@ int RecombFromSAMMain(int argc, char** argv) {
     
     std::cout << "5) Making a genetic map... " << std::endl;
     rp->findUniqueHetsCoveredByReadsAndSortThem(); // Find and sort informative SNPs
+    rp->findBoundingHetIndicesForEachReadPair(); // For each informative read-pair, find the indices of the bounding SNPs in the sorted het vector
     
     RecombMap* rm = new RecombMap(rp);
-    
     // Now do the calculation - roughly corresponds to one iteration of the EM algorithm
-    int numProcessedHets = 0;
     for (int i = 0; i < rm->recombFractions.size(); i++) {
-        int left = rp->coveredHetPos[i];
-        int right = rp->coveredHetPos[i + 1];
-        //int distSNPs = (right - left) + 1;
+        RecombInterval rj(i, rm->meanRate, rp->coveredHetPos[i], rp->coveredHetPos[i + 1]);
+        rj.initialiseIntervals(rp);
         
-        int coveringReadPairs = 0; double totalRecombFractionPerBP = 0; double totalConcordantFraction = 0;
-        
-        for (int j = 0; j != rp->allInformativePairs.size(); j++) {
-            if(rp->allInformativePairs[j]->posLeft <= left && rp->allInformativePairs[j]->posRight >= right){
-                coveringReadPairs++;
-                if (rp->allInformativePairs[j]->isRecombined) {
-                    double recombFractionPerBP = (double)1.0/(double)rp->allInformativePairs[j]->dist;
-                    totalRecombFractionPerBP += recombFractionPerBP;
-                } else {
-                    totalConcordantFraction++;
-                }
-            }
-        }
-       // std::cout << "totalConcordantFraction: " << totalConcordantFraction << std::endl;
-        
-        if (coveringReadPairs > 10) rm->recombFractions[i+1] = totalRecombFractionPerBP/totalConcordantFraction;
-        
-        numProcessedHets++;
-        if (numProcessedHets % 10000 == 0) {
-            std::cout << "numProcessedHets: " << numProcessedHets << " ("<< (double)numProcessedHets/rp->coveredHetPos.size() << "%)"<< std::endl;
-            std::cout << "pos: " << left << "bp"<< std::endl;
+        rp->coveredHetEffectiveDepth.push_back((int)rj.coveringReadPairs.size()); // This is just for stats
+            
+        rm->recombIntervals[i] = rj;
+        if (i % 5000 == 0) {
+            std::cout << "numProcessedHets: " << i << " ("<< (double)i/rm->recombFractions.size() << "%)"<< std::endl;
+            std::cout << "pos: " << rm->recombIntervals[i].leftCoord << "bp"<< std::endl;
             
         }
-        rp->coveredHetEffectiveDepth.push_back(coveringReadPairs);
     }
     
     // That's just approximating the chromosome beginning; do we want it?
-    *recombFile << "0\t" << rp->coveredHetPos[0] << "\t" << rm->recombFractions[0] << std::endl;
+    *recombFile << "0\t" << rm->recombIntervals[0].leftCoord << "\t" << rm->recombIntervals[0].recombFraction << std::endl;
     // Now the actual map
     for (int i = 0; i != rm->recombFractions.size(); i++) {
-        *recombFile << rp->coveredHetPos[i] << "\t" << rp->coveredHetPos[i + 1] << "\t" << rm->recombFractions[i] << std::endl;
+        *recombFile << rm->recombIntervals[i].leftCoord << "\t" << rm->recombIntervals[i].rightCoord << "\t" << rm->recombIntervals[i].recombFraction << std::endl;
     }
     std::cout << std::endl;
     

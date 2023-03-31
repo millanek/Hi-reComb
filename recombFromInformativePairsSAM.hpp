@@ -124,7 +124,19 @@ public:
         std::vector<int>::iterator it = std::unique(coveredHetPos.begin(), coveredHetPos.end());
         coveredHetPos.resize(distance(coveredHetPos.begin(),it));
         std::cout << "coveredHetPos.size() " << coveredHetPos.size() << std::endl;
+        for (int i = 0; i != coveredHetPos.size(); i++) {
+            hetPosToIndex[coveredHetPos[i]] = i;
+        }
+        
     }
+    
+    void findBoundingHetIndicesForEachReadPair() {
+        for (int i = 0; i != allInformativePairs.size(); i++) {
+            allInformativePairs[i]->indexLeft = hetPosToIndex.at(allInformativePairs[i]->posLeft);
+            allInformativePairs[i]->indexRight = hetPosToIndex.at(allInformativePairs[i]->posRight);
+        }
+    }
+    
     
     std::vector<DefiningRecombInfo*> getBootstrapSample() {
         std::random_device rd; // obtain a random number from hardware
@@ -144,6 +156,7 @@ private:
     // linking stats
     int num0het = 0; int num1het = 0; int num2plusHets = 0;
     int totalUsedReadLengthBp = 0;
+    std::map<int,int> hetPosToIndex;
     
     void categoriseBaseMatchMismatch(RecombReadPair* thisReadPair) {
         std::vector<HetInfo*>::iterator it = thisReadPair->hetSites.begin();
@@ -173,12 +186,34 @@ private:
 
 class RecombInterval {
 public:
-    RecombInterval(): totalRecombFractionPerBP(0), totalConcordantFraction(0),coveringReadPairs(0) {
-        
+    RecombInterval() {};
+    
+    RecombInterval(int leftIndex, double meanRate, int lc, int rc): totalRecombFractionPerBP(0), totalConcordantFraction(0) {
+        j = leftIndex;
+        recombFraction = meanRate;
+        leftCoord = lc; rightCoord = rc;
     };
     
+    int j;
+    int leftCoord;
+    int rightCoord;
     double recombFraction;
-    int coveringReadPairs;
+    std::vector<DefiningRecombInfo*> coveringReadPairs;
+    
+    void initialiseIntervals(RecombReadPairs* rp) {
+        for (int i = 0; i != rp->allInformativePairs.size(); i++) {
+            if(rp->allInformativePairs[i]->posLeft <= leftCoord && rp->allInformativePairs[i]->posRight >= rightCoord){
+                coveringReadPairs.push_back(rp->allInformativePairs[i]);
+                if (rp->allInformativePairs[i]->isRecombined) {
+                    double recombFractionPerBP = (double)1.0/(double)rp->allInformativePairs[i]->dist;
+                    totalRecombFractionPerBP += recombFractionPerBP;
+                } else {
+                    totalConcordantFraction++;
+                }
+            }
+        }
+        if (coveringReadPairs.size() > 10) recombFraction = totalRecombFractionPerBP/totalConcordantFraction;
+    }
     
 private:
     double totalRecombFractionPerBP;
@@ -195,10 +230,12 @@ public:
         
         // Initialise the recombination fractions assuming a uniform recombination rate along the genome (this uses the per-bp rate)
         std::vector<double> rF(rp->coveredHetPos.size() - 1, meanRate); recombFractions = rF;
+        recombIntervals.resize(rp->coveredHetPos.size() - 1);
     }; 
     
     double meanRate;
     std::vector<double> recombFractions;
+    std::vector<RecombInterval> recombIntervals;
     
     
 

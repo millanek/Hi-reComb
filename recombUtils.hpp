@@ -156,7 +156,7 @@ class RecombRead {
 
 class DefiningRecombInfo {
     public:
-    DefiningRecombInfo(int left, int right, double qLeft, double qRight, bool isSwitch) {
+    DefiningRecombInfo(int left, int right, double qLeft, double qRight, bool isSwitch): indexLeft(-1), indexRight(-1) {
         posLeft = left;
         posRight = right;
         phaseQualLeft = qLeft;
@@ -171,6 +171,11 @@ class DefiningRecombInfo {
     double phaseQualRight;
     int dist;
     bool isRecombined;
+    
+    // These are the indices in a sorted vector of all informative hets long the chromosome
+    // it cannot be assigned in contruction but is filled in later; -1 is just a placeholder for missing data
+    int indexLeft;
+    int indexRight;
 };
 
 
