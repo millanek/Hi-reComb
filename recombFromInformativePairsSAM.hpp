@@ -57,7 +57,6 @@ public:
     
     // Records about recombination-informative het sites
     std::vector<int> coveredHetPos;
-    std::vector<int> coveredHetEffectiveDepth; std::vector<int> coveredHetDirectDepth;
     
     void linkWithHets(std::map<int,PhaseInfo*>& posToPhase, int minBQ) {
         for (int i = 0; i < readPairs.size(); i++) {
@@ -188,36 +187,44 @@ class RecombInterval {
 public:
     RecombInterval() {};
     
-    RecombInterval(int leftIndex, double meanRate, int lc, int rc): totalRecombFractionPerBP(0), totalConcordantFraction(0) {
+    RecombInterval(int leftIndex, double meanRate, int lc, int rc): sumRecombFractionPerBP(0), sumConcordantFraction(0) {
         j = leftIndex;
-        recombFraction = meanRate;
+        recombFractionPerBp = meanRate;
+        
         leftCoord = lc; rightCoord = rc;
+        dj = rightCoord - leftCoord + 1;
+        rj = recombFractionPerBp * dj;
     };
     
     int j;
     int leftCoord;
     int rightCoord;
-    double recombFraction;
-    std::vector<DefiningRecombInfo*> coveringReadPairs;
+    double recombFractionPerBp;
+    int dj; double rj;
     
-    void initialiseIntervals(RecombReadPairs* rp) {
+    std::vector<DefiningRecombInfo*> coveringReadPairs;
+    double sum_P_ij;
+    double sumConcordantFraction;
+    double sumRecombFractionPerBP;
+
+    
+    void initialiseInterval(RecombReadPairs* rp) {
         for (int i = 0; i != rp->allInformativePairs.size(); i++) {
             if(rp->allInformativePairs[i]->posLeft <= leftCoord && rp->allInformativePairs[i]->posRight >= rightCoord){
                 coveringReadPairs.push_back(rp->allInformativePairs[i]);
                 if (rp->allInformativePairs[i]->isRecombined) {
-                    double recombFractionPerBP = (double)1.0/(double)rp->allInformativePairs[i]->dist;
-                    totalRecombFractionPerBP += recombFractionPerBP;
+                    double recombFractionPerBpThisPair = (double)1.0/(double)rp->allInformativePairs[i]->dist;
+                    sumRecombFractionPerBP += recombFractionPerBpThisPair;
                 } else {
-                    totalConcordantFraction++;
+                    sumConcordantFraction++;
                 }
             }
         }
-        if (coveringReadPairs.size() > 10) recombFraction = totalRecombFractionPerBP/totalConcordantFraction;
+        
+        if (coveringReadPairs.size() > 10) recombFractionPerBp = sumRecombFractionPerBP/sumConcordantFraction;
+        rj = recombFractionPerBp * dj;
     }
     
-private:
-    double totalRecombFractionPerBP;
-    double totalConcordantFraction;
 };
 
 
@@ -228,17 +235,128 @@ public:
         meanRate = (double)rp->numDiscordant/(double)rp->totalEffectiveLength;
         std::cout << "meanRecombinationRate " << meanRate << std::endl;
         
-        // Initialise the recombination fractions assuming a uniform recombination rate along the genome (this uses the per-bp rate)
-        std::vector<double> rF(rp->coveredHetPos.size() - 1, meanRate); recombFractions = rF;
+        
         recombIntervals.resize(rp->coveredHetPos.size() - 1);
+        for (int j = 0; j < recombIntervals.size(); j++) {
+            // Initialise the recombination fractions assuming a uniform recombination rate along the genome (this uses the per-bp rate)
+            RecombInterval ri(j, meanRate, rp->coveredHetPos[j], rp->coveredHetPos[j + 1]);
+            ri.initialiseInterval(rp); // Then calculate the first iteration
+            recombIntervals[j] = ri;
+            if (j % 5000 == 0) printUpdateOnPrompt(j);
+        }
+        std::cout << std::endl;
     }; 
     
     double meanRate;
-    std::vector<double> recombFractions;
     std::vector<RecombInterval> recombIntervals;
     
     
-
+    void printPcUpdateOnPrompt(int pc) {
+        if (pc == 100) std::cout << pc << "% (DONE)" << std::endl;
+        else { std::cout << pc << "%..."; std::cout.flush(); }
+    }
+    
+    double EMiteration(int EMiterationNum) {
+        std::cout << "Iteration " << EMiterationNum << ": " << std::endl;
+        updatePijs();
+        double delta = updateRecombFractions();
+        std::cout << std::endl;
+        return delta;
+    }
+    
+    void printUpdateOnPrompt(int j) {
+        std::cout << "numProcessedHets: " << j << " ("<< (double)j/recombIntervals.size() << "%)"<< std::endl;
+        std::cout << "pos: " << recombIntervals[j].leftCoord << "bp"<< std::endl;
+    }
+    
+    void outputMapToFile(string fileName) {
+        std::ofstream* f = new std::ofstream(fileName);
+        // That's just approximating the chromosome beginning; do we want it?
+        *f << "0\t" << recombIntervals[0].leftCoord << "\t" << recombIntervals[0].recombFractionPerBp << std::endl;
+        // Now the actual map
+        for (int i = 0; i != recombIntervals.size(); i++) {
+            *f << recombIntervals[i].leftCoord << "\t" << recombIntervals[i].rightCoord << "\t" << recombIntervals[i].recombFractionPerBp << std::endl;
+        }
+    }
+    
+    void calculateAndPrintPerHetCoverageStats(string fn, RecombReadPairs* rp) {
+        std::ofstream* depthFile = new std::ofstream(fn + ".txt");
+        for (int i = 0; i != recombIntervals.size() - 1; i++) {
+            int coverageDirectlyOnTheHet = 0;
+            int thisHetPos = recombIntervals[i].leftCoord;
+            for (int j = 0; j != rp->allInformativePairs.size(); j++) {
+                if(rp->allInformativePairs[j]->posLeft == thisHetPos || rp->allInformativePairs[j]->posRight == thisHetPos){
+                    coverageDirectlyOnTheHet++;
+                }
+            }
+            int coveredHetEffectiveDepth = (int)recombIntervals[i].coveringReadPairs.size();
+            *depthFile << thisHetPos << "\t" << recombIntervals[i].recombFractionPerBp << "\t" << coveredHetEffectiveDepth << "\t" << coverageDirectlyOnTheHet << std::endl;
+        }
+    }
+    
+private:
+    void getSumPijForInterval(int intervalIndex) {
+        RecombInterval* i = &recombIntervals[intervalIndex];
+        
+       /* if (intervalIndex == 40) {
+            std::cout << "i.coveringReadPairs.size(): " << i.coveringReadPairs.size() << std::endl;
+        } */
+        i->sum_P_ij = 0;
+        for (int r = 0; r < i->coveringReadPairs.size(); r++) {
+            if (!i->coveringReadPairs[r]->isRecombined) continue;
+            double sum_r_k = 0;
+            /* if (intervalIndex == 40) {
+                std::cout << "i.coveringReadPairs[r]->indexLeft: " << i.coveringReadPairs[r]->indexLeft << std::endl;
+                std::cout << "i.coveringReadPairs[r]->indexRight: " << i.coveringReadPairs[r]->indexRight << std::endl;
+            } */
+            for (int k = i->coveringReadPairs[r]->indexLeft; k < i->coveringReadPairs[r]->indexRight; k++) {
+                sum_r_k += recombIntervals[k].rj;
+            //    if (r == 5) {
+            //    std::cout << "k: " << k << std::endl;
+            //    std::cout << "recombIntervals[k].rj: " << recombIntervals[k].rj << std::endl;
+            //    }
+            }
+            double p_ij = i->rj/sum_r_k;  // eq. (2) from proposal
+             /* if (intervalIndex == 40) {
+                std::cout << "r: " << r << std::endl;
+                std::cout << "i.rj: " << i.rj << std::endl;
+                std::cout << "sum_r_k: " << sum_r_k << std::endl;
+                std::cout << "p_ij: " << p_ij << std::endl;
+                std::cout << std::endl;
+            } */
+            i->sum_P_ij += p_ij;
+        }
+        
+            /*if (intervalIndex == 40) {
+                std::cout << "intervalIndex: " << intervalIndex << std::endl;
+            std::cout << "i.sum_P_ij: " << i->sum_P_ij << std::endl;
+        } */
+    }
+    
+    void updatePijs() {
+       // std::cout << "Updating p_ij values: " << std::endl;
+        int pc = 0;
+        for (int j = 0; j < recombIntervals.size(); j++) {
+            getSumPijForInterval(j);
+            
+            int update5pcInterval = (int)recombIntervals.size() / 20;
+            if (j > 0 && j % update5pcInterval == 0) { pc += 5; printPcUpdateOnPrompt(pc); }
+        }
+    }
+    
+    double updateRecombFractions() {
+        // std::cout << "Updating recombination fractions: " << std::endl;
+        double delta = 0;
+        for (int j = 0; j < recombIntervals.size(); j++) {
+            double newRj = recombIntervals[j].sum_P_ij / recombIntervals[j].sumConcordantFraction;
+            if (!isnan(newRj)) delta += abs(newRj - recombIntervals[j].rj);
+            recombIntervals[j].rj = newRj;
+            recombIntervals[j].recombFractionPerBp = recombIntervals[j].rj / recombIntervals[j].dj;
+        }
+        std::cout << "delta: " << delta << std::endl;
+        return delta;
+    }
+    
 };
 
 #endif /* recombFromInformativePairsSAM_hpp */

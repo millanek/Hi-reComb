@@ -26,10 +26,9 @@
 
 static const char *DISCORDPAIRS_USAGE_MESSAGE =
 "Usage: " PROGRAM_BIN " " SUBPROGRAM " [OPTIONS] hapcutBlockFile.txt INFORMATVE_PAIRS.sam\n"
-"Select reads/fragments from the PAIRTOOLS_FILE which could be informative about recombination:\n"
+"Generate a recombination map from a phased hapcut2 file of heterozygous sites and a sam file with read pairs covering the hets\n"
 "\n"
 "       -h, --help                              display this help and exit\n"
-"       -n, --run-name                          run-name will be included in the output file name\n"
 "       -m, --min-MQ                            (default: 20) the minimum mapping quality for a read to be considered\n"
 "       -b, --min-BQ                            (default: 30) the minimum base quality for assesssing discordant phase\n"
 "       -d, --min-Dist                          (default: 1000) the minimum distance (bp) to consider discordant phase a recombination\n"
@@ -37,9 +36,13 @@ static const char *DISCORDPAIRS_USAGE_MESSAGE =
 "       -p, --min-PQ                            (default: 0) the minimum phase quality for assesssing discordant phase\n"
 "       -s, --subsetHets=FILE.txt               (optional) Exclude the sites specified in this file\n"
 "\n"
+"OUTPUT OPTIONS:\n"
+"       -n, --run-name=RN                       (optional) Will be included in the output file name: recombMap_RN.txt\n"
+"       -c, --coverageStats=OUTFILE             (optional) Output coverage over each het site into OUTFILE.txt\n"
+"\n"
 "\nReport bugs to " PACKAGE_BUGREPORT "\n\n";
 
-static const char* shortopts = "hn:b:m:p:d:s:";
+static const char* shortopts = "hn:b:m:p:d:s:c:";
 
 //enum { OPT_ANNOT, OPT_AF  };
 
@@ -51,6 +54,7 @@ static const struct option longopts[] = {
     { "min-PQ",   required_argument, NULL, 'p' },
     { "min-Dist",   required_argument, NULL, 'd' },
     { "subsetHets",   required_argument, NULL, 's' },
+    { "coverageStats",   required_argument, NULL, 'c' },
     { NULL, 0, NULL, 0 }
 };
 
@@ -64,14 +68,11 @@ namespace opt
     static int minPQ = 0;
     static int minDist = 1000;
     static string hetsSubset;
+    static string coverageStatsFile;
 }
 
 int RecombFromSAMMain(int argc, char** argv) {
     parseRecombFromSAMOptions(argc, argv);
-    string line; // for reading the input files
-        
-    std::ofstream* recombFile = new std::ofstream("recombMap" + opt::runName + ".txt");
-    std::ofstream* depthFile = new std::ofstream("recombMap_wDepth" + opt::runName + ".txt");
     
     std::cout << "1) Processing hets..." << std::endl;
     AllPhaseInfo* p = new AllPhaseInfo(opt::hetsFile, opt::minPQ, opt::hetsSubset);
@@ -123,51 +124,25 @@ int RecombFromSAMMain(int argc, char** argv) {
     rp->findUniqueHetsCoveredByReadsAndSortThem(); // Find and sort informative SNPs
     rp->findBoundingHetIndicesForEachReadPair(); // For each informative read-pair, find the indices of the bounding SNPs in the sorted het vector
     
+    // Now do the initial calculation of recombination fraction for each interval
     RecombMap* rm = new RecombMap(rp);
-    // Now do the calculation - roughly corresponds to one iteration of the EM algorithm
-    for (int i = 0; i < rm->recombFractions.size(); i++) {
-        RecombInterval rj(i, rm->meanRate, rp->coveredHetPos[i], rp->coveredHetPos[i + 1]);
-        rj.initialiseIntervals(rp);
-        
-        rp->coveredHetEffectiveDepth.push_back((int)rj.coveringReadPairs.size()); // This is just for stats
-            
-        rm->recombIntervals[i] = rj;
-        if (i % 5000 == 0) {
-            std::cout << "numProcessedHets: " << i << " ("<< (double)i/rm->recombFractions.size() << "%)"<< std::endl;
-            std::cout << "pos: " << rm->recombIntervals[i].leftCoord << "bp"<< std::endl;
-            
-        }
-    }
     
-    // That's just approximating the chromosome beginning; do we want it?
-    *recombFile << "0\t" << rm->recombIntervals[0].leftCoord << "\t" << rm->recombIntervals[0].recombFraction << std::endl;
-    // Now the actual map
-    for (int i = 0; i != rm->recombFractions.size(); i++) {
-        *recombFile << rm->recombIntervals[i].leftCoord << "\t" << rm->recombIntervals[i].rightCoord << "\t" << rm->recombIntervals[i].recombFraction << std::endl;
+    double delta = std::numeric_limits<double>::max(); int EMiterationNum = 0;
+    std::cout << "Starting EM iterations..." << std::endl;
+    while (delta > 0.1) {
+        EMiterationNum++; delta = rm->EMiteration(EMiterationNum);
     }
-    std::cout << std::endl;
+    rm->outputMapToFile("recombMap" + opt::runName + ".txt");
+    
+  //  std::cout << "5a) Bootstrap... " << std::endl;
+    
+    
     
     std::cout << "6) Collecting stats... " << std::endl;
-    
     // a) Prints out the distribition of recombination rates based on read pairs with variable-length inserts
     collectRateStatsBasedOnInsertLength(rp->phaseSwitches, rp->concordantPairs);
-    
-    int coverageDirectlyOnTheHet = 0;
-    for (int i = 0; i != rp->coveredHetPos.size() - 1; i++) {
-        int thisHetPos = rp->coveredHetPos[i];
-        for (int j = 0; j != rp->phaseSwitches.size(); j++) {
-            if(rp->phaseSwitches[j]->posLeft == thisHetPos || rp->phaseSwitches[j]->posRight == thisHetPos){
-                coverageDirectlyOnTheHet++;
-            }
-        }
-        for (int j = 0; j != rp->concordantPairs.size(); j++) {
-            if(rp->concordantPairs[j]->posLeft == thisHetPos || rp->concordantPairs[j]->posRight == thisHetPos){
-                coverageDirectlyOnTheHet++;
-            }
-        }
-        rp->coveredHetDirectDepth.push_back(coverageDirectlyOnTheHet);
-        *depthFile << thisHetPos << "\t" << rm->recombFractions[i] << "\t" << rp->coveredHetEffectiveDepth[i] << "\t" << coverageDirectlyOnTheHet << std::endl;
-    }
+    // b) Calculate and print coverage stats (effective coverage and direct coverage) per het site
+    if(!opt::coverageStatsFile.empty()) rm->calculateAndPrintPerHetCoverageStats(opt::coverageStatsFile, rp);
     
     return 0;
 }
@@ -186,6 +161,7 @@ void parseRecombFromSAMOptions(int argc, char** argv) {
             case 'd': arg >> opt::minDist; break;
             case 'p': arg >> opt::minPQ; break;
             case 's': arg >> opt::hetsSubset; break;
+            case 'c': arg >> opt::coverageStatsFile; break;
             case 'h':
                 std::cout << DISCORDPAIRS_USAGE_MESSAGE;
                 exit(EXIT_SUCCESS);
@@ -220,7 +196,7 @@ void collectRateStatsBasedOnInsertLength(const std::vector<DefiningRecombInfo*>&
     std::vector<int> windowSizeMax = {1000,2000,5000,10000,100000,1000000,1000000000};
     int totalRecombs = 0; int totalNonRecombs = 0; long long int totalL = 0;
     for (int j = 0; j != phaseSwitches.size(); j++) {
-        int l = phaseSwitches[j]->posRight - phaseSwitches[j]->posLeft + 1;
+        int l = phaseSwitches[j]->dist;
         //std::cout << "l = " << l << std::endl;
         for (int k = 0; k != lengthOfInformativeSequenceWindows.size(); k++) {
             if (l > windowSizeMins[k] && l <= windowSizeMax[k]) {
