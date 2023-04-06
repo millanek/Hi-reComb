@@ -14,7 +14,64 @@
 void parseRecombFromSAMOptions(int argc, char** argv);
 int RecombFromSAMMain(int argc, char** argv);
 
-void collectRateStatsBasedOnInsertLength(const std::vector<DefiningRecombInfo*>& phaseSwitches, const std::vector<DefiningRecombInfo*>& phaseConcordanceCoords);
+class RecombReadPairsStats {
+public:
+    
+    RecombReadPairsStats(): numConcordant(0), numDiscordant(0), totalEffectiveLength(0) {
+        windowSizeMins = {0,1000,2000,5000,10000,100000,1000000};
+        windowSizeMax = {1000,2000,5000,10000,100000,1000000,1000000000};
+        numRecombsInSizeWindows.resize(windowSizeMins.size(),0);
+        numNonRecombsInSizeWindows.resize(windowSizeMins.size(),0);
+        lengthOfInformativeSequenceWindows.resize(windowSizeMins.size(),0);
+    }
+    
+    void collectStats(std::vector<DefiningRecombInfo*>& allInformativePairs) {
+        
+        for (int j = 0; j < allInformativePairs.size(); j++) {
+            int l = allInformativePairs[j]->dist;
+          //  std::cout << "l = " << l << std::endl;
+          //  std::cout << "windowSizeMins.size() = " << windowSizeMins.size() << std::endl;
+            for (int k = 0; k < windowSizeMins.size(); k++) {
+          //      std::cout << "k = " << k << std::endl;
+                if (l > windowSizeMins[k] && l <= windowSizeMax[k]) {
+                    if (allInformativePairs[j]->isRecombined) {
+                        numRecombsInSizeWindows[k]++; numDiscordant++; lengthOfInformativeSequenceWindows[k] += l; totalEffectiveLength += l;
+                    } else {
+                        numNonRecombsInSizeWindows[k]++; numConcordant++; lengthOfInformativeSequenceWindows[k] += l; totalEffectiveLength += l;
+                    }
+                }
+            }
+        }
+        
+        for (int j = 0; j < windowSizeMins.size(); j++) {
+            double thisWindowRate = (double)numRecombsInSizeWindows[j]/lengthOfInformativeSequenceWindows[j];
+            windowRates.push_back(thisWindowRate);
+        }
+        
+    };
+    
+    int numConcordant; int numDiscordant; long long int totalEffectiveLength;
+    std::vector<double> windowRates;
+    
+    void printRecombReadPairStats() {
+        for (int j = 0; j != windowSizeMins.size(); j++) {
+            std::cout << "window: " << windowSizeMins[j] << " - " << windowSizeMax[j] <<
+                "; rate = " << windowRates[j] << "; n recomb = " << numRecombsInSizeWindows[j] << "; n non-recomb = " << numNonRecombsInSizeWindows[j] <<
+                "; seqLength = " << lengthOfInformativeSequenceWindows[j] << std::endl;
+        }
+        std::cout << "total rate = " << (double)numConcordant/totalEffectiveLength << "; n recomb = " << numDiscordant << "; n non-recomb = " << numConcordant << "; seqLength = " << totalEffectiveLength << std::endl;
+    }
+    
+    
+private:
+    // Size windows are 0 - 1000bp, 1001 - 2000 bp, 2000 - 5000bp, 5000 - 10000, 10000 - 100000, 100000 - 1000000, 1M+
+    std::vector<int> windowSizeMins;
+    std::vector<int> windowSizeMax;
+    std::vector<int> numRecombsInSizeWindows;
+    std::vector<int> numNonRecombsInSizeWindows;
+    std::vector<long long int> lengthOfInformativeSequenceWindows;
+    
+};
 
 class RecombReadPairs {
 public:
@@ -48,12 +105,8 @@ public:
 //    std::vector<double> concordantBaseScores; std::vector<double> discordantBaseScores;
     
     // Recombination stats
-    int numConcordant = 0; int numDiscordant = 0;
-    long long int totalEffectiveLength = 0;
-    // Details about discordant read pairs to output by the printSwitchInfoIntoFile() method
-    std::vector<DefiningRecombInfo*> phaseSwitches;
-    std::vector<DefiningRecombInfo*> concordantPairs;
     std::vector<DefiningRecombInfo*> allInformativePairs;
+    RecombReadPairsStats* stats = new RecombReadPairsStats();
     
     // Records about recombination-informative het sites
     std::vector<int> coveredHetPos;
@@ -100,8 +153,10 @@ public:
     
     void printSwitchInfoIntoFile(string fileName) {
         std::ofstream* phaseSwitchFile = new std::ofstream(fileName);
-        for (int i = 0; i != phaseSwitches.size(); i++) {
-            *phaseSwitchFile << phaseSwitches[i]->posLeft << "\t" << phaseSwitches[i]->posRight << "\t" << phaseSwitches[i]->dist << "\t" << phaseSwitches[i]->phaseQualLeft << "\t" << phaseSwitches[i]->phaseQualRight << std::endl;
+        for (int i = 0; i != allInformativePairs.size(); i++) {
+            if (allInformativePairs[i]->isRecombined) {
+                *phaseSwitchFile << allInformativePairs[i]->posLeft << "\t" << allInformativePairs[i]->posRight << "\t" << allInformativePairs[i]->dist << "\t" << allInformativePairs[i]->phaseQualLeft << "\t" << allInformativePairs[i]->phaseQualRight << std::endl;
+            }
         }
     }
     
@@ -123,9 +178,9 @@ public:
     }
     
     void printConcordDiscordStats() {
-        std::cout << "Effective coverage (bp): " << totalEffectiveLength << std::endl;
-        std::cout << "numConcordant: " << numConcordant << std::endl;
-        std::cout << "numDiscordant: " << numDiscordant << std::endl;
+        std::cout << "Effective coverage (bp): " << stats->totalEffectiveLength << std::endl;
+        std::cout << "numConcordant: " << stats->numConcordant << std::endl;
+        std::cout << "numDiscordant: " << stats->numDiscordant << std::endl;
     }
     
     void findUniqueHetsCoveredByReadsAndSortThem() {
@@ -242,17 +297,19 @@ class RecombMap {
 public:
     RecombMap(RecombReadPairs* rp) {
         // Get the mean recombination rate per bp
-        meanRate = (double)rp->numDiscordant/(double)rp->totalEffectiveLength;
+        meanRate = (double)rp->stats->numDiscordant/(double)rp->stats->totalEffectiveLength;
         std::cout << "meanRecombinationRate " << meanRate << std::endl;
         
         
-        recombIntervals.resize(rp->coveredHetPos.size() - 1);
+        recombIntervals.resize(rp->coveredHetPos.size() - 1); int pc = 0;
         for (int j = 0; j < recombIntervals.size(); j++) {
             // Initialise the recombination fractions assuming a uniform recombination rate along the genome (this uses the per-bp rate)
             RecombInterval ri(j, meanRate, rp->coveredHetPos[j], rp->coveredHetPos[j + 1]);
             ri.initialiseInterval(rp); // Then calculate the first iteration
             recombIntervals[j] = ri;
-            if (j % 5000 == 0) printUpdateOnPrompt(j);
+            int update5pcInterval = (int)recombIntervals.size() / 20;
+            if (j > 0 && j % update5pcInterval == 0) { pc += 5; printPcUpdateOnPrompt(pc); }
+            // if (j % 5000 == 0) printUpdateOnPrompt(j);
         }
         std::cout << std::endl;
     }; 

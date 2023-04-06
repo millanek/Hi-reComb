@@ -101,20 +101,19 @@ int RecombFromSAMMain(int argc, char** argv) {
         thisReadPair->determineIfReadPairConcordantOrDiscordant();
         
         if (thisReadPair->pairRecombinationStatus == PAIR_DISCORDANT) {
-            rp->numDiscordant++;
             thisPairInformation = thisReadPair->getDefiningHetPair(thisReadPair->switchPairI, thisReadPair->switchPairJ);
-            rp->phaseSwitches.push_back(thisPairInformation);
         } else if (thisReadPair->pairRecombinationStatus == PAIR_CONCORDANT) {
-            rp->numConcordant++;
             thisPairInformation = thisReadPair->getDefiningHetPair(thisReadPair->concordPairI, thisReadPair->concordPairJ);
-            rp->concordantPairs.push_back(thisPairInformation);
         }
         if (thisReadPair->pairRecombinationStatus != PAIR_AMBIGUOUS) {
             rp->allInformativePairs.push_back(thisPairInformation);
-            rp->totalEffectiveLength = rp->totalEffectiveLength + thisPairInformation->dist;
         }
     }
-    rp->printConcordDiscordStats();
+    rp->stats->collectStats(rp->allInformativePairs);
+    //std::cout << "Here..." << std::endl;
+
+   // rp->printConcordDiscordStats();
+    rp->stats->printRecombReadPairStats();
     rp->printSwitchInfoIntoFile("switches" + opt::runName + ".txt");
     std::cout << std::endl;
     
@@ -139,9 +138,7 @@ int RecombFromSAMMain(int argc, char** argv) {
     
     
     std::cout << "6) Collecting stats... " << std::endl;
-    // a) Prints out the distribition of recombination rates based on read pairs with variable-length inserts
-    collectRateStatsBasedOnInsertLength(rp->phaseSwitches, rp->concordantPairs);
-    // b) Calculate and print coverage stats (effective coverage and direct coverage) per het site
+    // Calculate and print coverage stats (effective coverage and direct coverage) per het site
     if(!opt::coverageStatsFile.empty()) rm->calculateAndPrintPerHetCoverageStats(opt::coverageStatsFile, rp);
     
     return 0;
@@ -186,40 +183,4 @@ void parseRecombFromSAMOptions(int argc, char** argv) {
     // Parse the input filenames
     opt::hetsFile = argv[optind++];
     opt::samFile = argv[optind++];
-}
-
-void collectRateStatsBasedOnInsertLength(const std::vector<DefiningRecombInfo*>& phaseSwitches, const std::vector<DefiningRecombInfo*>& phaseConcordanceCoords) {
-    // Size windows are 0 - 1000bp, 1001 - 2000 bp, 2000 - 5000bp, 5000 - 10000, 10000 - 100000, 100000 - 1000000, 1M+
-    std::vector<int> numRecombsInSizeWindows(7,0); std::vector<int> numNonRecombsInSizeWindows(7,0);
-    std::vector<long long int> lengthOfInformativeSequenceWindows(7,0);
-    std::vector<int> windowSizeMins = {0,1000,2000,5000,10000,100000,1000000};
-    std::vector<int> windowSizeMax = {1000,2000,5000,10000,100000,1000000,1000000000};
-    int totalRecombs = 0; int totalNonRecombs = 0; long long int totalL = 0;
-    for (int j = 0; j != phaseSwitches.size(); j++) {
-        int l = phaseSwitches[j]->dist;
-        //std::cout << "l = " << l << std::endl;
-        for (int k = 0; k != lengthOfInformativeSequenceWindows.size(); k++) {
-            if (l > windowSizeMins[k] && l <= windowSizeMax[k]) {
-                numRecombsInSizeWindows[k]++; totalRecombs++; lengthOfInformativeSequenceWindows[k] += l; totalL += l;
-            }
-        }
-    }
-    for (int j = 0; j != phaseConcordanceCoords.size(); j++) {
-        int l = phaseConcordanceCoords[j]->dist;
-        
-        for (int k = 0; k != lengthOfInformativeSequenceWindows.size(); k++) {
-            if (l > windowSizeMins[k] && l <= windowSizeMax[k]) {
-                numNonRecombsInSizeWindows[k]++; totalNonRecombs++; lengthOfInformativeSequenceWindows[k] += l; totalL += l;
-            }
-        }
-    }
-
-    for (int j = 0; j != lengthOfInformativeSequenceWindows.size(); j++) {
-        double thisWindowRate = (double)numRecombsInSizeWindows[j]/lengthOfInformativeSequenceWindows[j];
-        std::cout << "window: " << windowSizeMins[j] << " - " << windowSizeMax[j] <<
-            "; rate = " << thisWindowRate << "; n recomb = " << numRecombsInSizeWindows[j] << "; n non-recomb = " << numNonRecombsInSizeWindows[j] <<
-            "; seqLength = " << lengthOfInformativeSequenceWindows[j] << std::endl;
-    }
-    std::cout << "total rate = " << (double)totalRecombs/totalL << "; n recomb = " << totalRecombs << "; n non-recomb = " << totalNonRecombs << "; seqLength = " << totalL << std::endl;
-
 }
