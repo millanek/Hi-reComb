@@ -83,7 +83,7 @@ int RecombFromSAMMain(int argc, char** argv) {
     std::cout << std::endl;
     
     std::cout << "3) Linking read-pairs and phased hets... " << std::endl;
-    rp->linkWithHets(p->posToPhase, opt::minBQ);
+    rp->linkWithHets(p->posToPhase, p->subsetLoci, opt::minBQ);
     rp->printBaseQualityStats();
     rp->printReadPairStats();
     

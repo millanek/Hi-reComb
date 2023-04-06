@@ -58,7 +58,7 @@ public:
     // Records about recombination-informative het sites
     std::vector<int> coveredHetPos;
     
-    void linkWithHets(std::map<int,PhaseInfo*>& posToPhase, int minBQ) {
+    void linkWithHets(const std::map<int,PhaseInfo*>& posToPhase, const std::map <int, bool>& subsetLoci, const int minBQ) {
         for (int i = 0; i < readPairs.size(); i++) {
             RecombReadPair* thisReadPair = readPairs[i];
             thisReadPair->findAndCombinePairHets(posToPhase);
@@ -70,9 +70,19 @@ public:
             // Find the number of informative heterozygous sites on this read-pair
             collectHetNumStats(thisReadPair);
             
+            bool bContainsSubsetLoci = false; // Ignore read pairs with excluded SNPs
+            
+            for (int j = 0; j < thisReadPair->hetSites.size(); j++) {
+                //std::cout << "thisReadPair->hetSites[j]->pos: " << thisReadPair->hetSites[j]->pos << std::endl;
+                if (subsetLoci.count(thisReadPair->hetSites[j]->pos) == 1) {
+                    bContainsSubsetLoci = true;
+                  //  std::cout << "thisReadPair->hetSites[j]->pos: " << thisReadPair->hetSites[j]->pos << std::endl;
+                }
+            }
+            
             // Check if there is a pair of hets on the two reads belonging to the same phase-block
             // If yes, the read-pair is then categorised as phase-informative
-            if (thisReadPair->hetSites.size() > 1) {
+            if (thisReadPair->hetSites.size() > 1 && !bContainsSubsetLoci) {
                 thisReadPair->read1->linkHetsWithPhaseBlock();
                 thisReadPair->read2->linkHetsWithPhaseBlock();
                 for (std::map<int, std::vector<int>>::iterator it = thisReadPair->read1->BlockIDsToHetPos.begin();

@@ -231,7 +231,6 @@ class AllPhaseInfo {
         string line;
         
         std::ifstream* hapcutFile = new std::ifstream(hapcutFileName.c_str()); assertFileOpen(*hapcutFile, hapcutFileName);
-        std::map <int, bool> subsetLoci;
         if (!subsetFileName.empty()) {
             std::ifstream* subsetFile = new std::ifstream(subsetFileName.c_str()); assertFileOpen(*subsetFile, subsetFileName);
             while (getline(*subsetFile, line)) {
@@ -248,7 +247,8 @@ class AllPhaseInfo {
             } else {
                 std::vector<string> phasedSNPdetails = split(line, '\t');
                 PhaseInfo* thisPhase = new PhaseInfo(phasedSNPdetails,blockNum);
-                if (thisPhase->valid && thisPhase->coverage > 2 && (subsetLoci.size() == 0 || subsetLoci.count(thisPhase->pos) == 0)
+                if (thisPhase->valid && thisPhase->coverage > 2
+                    //&& (subsetLoci.size() == 0 || subsetLoci.count(thisPhase->pos) == 0)
                     && thisPhase->quality >= minPhaseQual) {
                     posToPhase[thisPhase->pos] = thisPhase;
                     phaseBlockSNPnums[blockNum-1]++;
@@ -259,6 +259,7 @@ class AllPhaseInfo {
     }
     
     std::map<int,PhaseInfo*> posToPhase;
+    std::map <int, bool> subsetLoci;
     std::vector<int> phaseBlockSNPnums;
 };
 
