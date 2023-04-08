@@ -110,13 +110,11 @@ int RecombFromSAMMain(int argc, char** argv) {
         }
     }
     rp->stats->collectStats(rp->allInformativePairs);
-    //std::cout << "Here..." << std::endl;
-
-   // rp->printConcordDiscordStats();
     rp->stats->printRecombReadPairStats();
     rp->printSwitchInfoIntoFile("switches" + opt::runName + ".txt");
     std::cout << std::endl;
     
+    rp->adjustRecombinationProbabilities();
     
     
     std::cout << "5) Making a genetic map... " << std::endl;
@@ -128,17 +126,15 @@ int RecombFromSAMMain(int argc, char** argv) {
     
     double delta = std::numeric_limits<double>::max(); int EMiterationNum = 0;
     std::cout << "Starting EM iterations..." << std::endl;
-    while (delta > 0.1) {
+   // while (delta > 0.1) {
         EMiterationNum++; delta = rm->EMiteration(EMiterationNum);
-    }
+    //}
     rm->outputMapToFile("recombMap" + opt::runName + ".txt");
     
-  //  std::cout << "5a) Bootstrap... " << std::endl;
+    // std::cout << "5a) Bootstrap... " << std::endl;
     
     
-    
-    std::cout << "6) Collecting stats... " << std::endl;
-    // Calculate and print coverage stats (effective coverage and direct coverage) per het site
+    // Optional: calculate and print coverage stats (effective coverage and direct coverage) per het site
     if(!opt::coverageStatsFile.empty()) rm->calculateAndPrintPerHetCoverageStats(opt::coverageStatsFile, rp);
     
     return 0;

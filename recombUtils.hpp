@@ -163,6 +163,8 @@ class DefiningRecombInfo {
         phaseQualRight = qRight;
         dist = abs(right - left) + 1;
         isRecombined = isSwitch;
+        if (isRecombined) probabilityRecombined = 1;
+        else probabilityRecombined = 0;
     };
     
     int posLeft;
@@ -171,6 +173,7 @@ class DefiningRecombInfo {
     double phaseQualRight;
     int dist;
     bool isRecombined;
+    double probabilityRecombined;
     
     // These are the indices in a sorted vector of all informative hets long the chromosome
     // it cannot be assigned in contruction but is filled in later; -1 is just a placeholder for missing data

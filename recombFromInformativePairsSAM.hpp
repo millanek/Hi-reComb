@@ -59,7 +59,13 @@ public:
                 "; rate = " << windowRates[j] << "; n recomb = " << numRecombsInSizeWindows[j] << "; n non-recomb = " << numNonRecombsInSizeWindows[j] <<
                 "; seqLength = " << lengthOfInformativeSequenceWindows[j] << std::endl;
         }
-        std::cout << "total rate = " << (double)numConcordant/totalEffectiveLength << "; n recomb = " << numDiscordant << "; n non-recomb = " << numConcordant << "; seqLength = " << totalEffectiveLength << std::endl;
+        std::cout << "total rate = " << (double)numDiscordant/totalEffectiveLength << "; n recomb = " << numDiscordant << "; n non-recomb = " << numConcordant << "; seqLength = " << totalEffectiveLength << std::endl;
+    }
+    
+    void printBasicStats() { // CURRENTLY NOT USED
+        std::cout << "Effective coverage (bp): " << totalEffectiveLength << std::endl;
+        std::cout << "numConcordant: " << numConcordant << std::endl;
+        std::cout << "numDiscordant: " << numDiscordant << std::endl;
     }
     
     
@@ -177,11 +183,6 @@ public:
         std::cout << std::endl;
     }
     
-    void printConcordDiscordStats() {
-        std::cout << "Effective coverage (bp): " << stats->totalEffectiveLength << std::endl;
-        std::cout << "numConcordant: " << stats->numConcordant << std::endl;
-        std::cout << "numDiscordant: " << stats->numDiscordant << std::endl;
-    }
     
     void findUniqueHetsCoveredByReadsAndSortThem() {
         std::sort(coveredHetPos.begin(), coveredHetPos.end());
@@ -213,6 +214,20 @@ public:
             bootstrapSample[i] = allInformativePairs[s];
         }
         return bootstrapSample;
+    }
+    
+    void adjustRecombinationProbabilities() {
+        double meanL = stats->totalEffectiveLength / (double)(stats->numDiscordant + stats->numConcordant);
+        std::cout << "meanL: " << meanL << std::endl;
+        for (int j = 0; j < allInformativePairs.size(); j++) {
+            if (allInformativePairs[j]->isRecombined) {
+                if (allInformativePairs[j]->dist < meanL) {
+                    allInformativePairs[j]->probabilityRecombined = allInformativePairs[j]->dist / meanL;
+                    std::cout << "dist: " << allInformativePairs[j]->dist << std::endl;
+                    std::cout << "new p: " << allInformativePairs[j]->probabilityRecombined << std::endl;
+                }
+            }
+        }
     }
     
     
@@ -278,7 +293,8 @@ public:
             if(rp->allInformativePairs[i]->posLeft <= leftCoord && rp->allInformativePairs[i]->posRight >= rightCoord){
                 coveringReadPairs.push_back(rp->allInformativePairs[i]);
                 if (rp->allInformativePairs[i]->isRecombined) {
-                    double recombFractionPerBpThisPair = (double)1.0/(double)rp->allInformativePairs[i]->dist;
+                    double recombFractionPerBpThisPair = (double)rp->allInformativePairs[i]->probabilityRecombined/(double)rp->allInformativePairs[i]->dist;
+                    //  double recombFractionPerBpThisPair = (double)1.0/(double)rp->allInformativePairs[i]->dist;
                     sumRecombFractionPerBP += recombFractionPerBpThisPair;
                 } else {
                     sumConcordantFraction++;
@@ -365,39 +381,16 @@ private:
     void getSumPijForInterval(int intervalIndex) {
         RecombInterval* i = &recombIntervals[intervalIndex];
         
-       /* if (intervalIndex == 40) {
-            std::cout << "i.coveringReadPairs.size(): " << i.coveringReadPairs.size() << std::endl;
-        } */
         i->sum_P_ij = 0;
         for (int r = 0; r < i->coveringReadPairs.size(); r++) {
             if (!i->coveringReadPairs[r]->isRecombined) continue;
             double sum_r_k = 0;
-            /* if (intervalIndex == 40) {
-                std::cout << "i.coveringReadPairs[r]->indexLeft: " << i.coveringReadPairs[r]->indexLeft << std::endl;
-                std::cout << "i.coveringReadPairs[r]->indexRight: " << i.coveringReadPairs[r]->indexRight << std::endl;
-            } */
             for (int k = i->coveringReadPairs[r]->indexLeft; k < i->coveringReadPairs[r]->indexRight; k++) {
                 sum_r_k += recombIntervals[k].rj;
-            //    if (r == 5) {
-            //    std::cout << "k: " << k << std::endl;
-            //    std::cout << "recombIntervals[k].rj: " << recombIntervals[k].rj << std::endl;
-            //    }
             }
-            double p_ij = i->rj/sum_r_k;  // eq. (2) from proposal
-             /* if (intervalIndex == 40) {
-                std::cout << "r: " << r << std::endl;
-                std::cout << "i.rj: " << i.rj << std::endl;
-                std::cout << "sum_r_k: " << sum_r_k << std::endl;
-                std::cout << "p_ij: " << p_ij << std::endl;
-                std::cout << std::endl;
-            } */
+            double p_ij = (i->rj *  i->coveringReadPairs[r]->probabilityRecombined) / sum_r_k;  // eq. (2) from proposal
             i->sum_P_ij += p_ij;
         }
-        
-            /*if (intervalIndex == 40) {
-                std::cout << "intervalIndex: " << intervalIndex << std::endl;
-            std::cout << "i.sum_P_ij: " << i->sum_P_ij << std::endl;
-        } */
     }
     
     void updatePijs() {
