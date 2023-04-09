@@ -48,10 +48,13 @@ public:
             windowRates.push_back(thisWindowRate);
         }
         
+        meanLength = totalEffectiveLength / (double)(numDiscordant + numConcordant);
     };
     
-    int numConcordant; int numDiscordant; long long int totalEffectiveLength;
+    int numConcordant; int numDiscordant;
+    long long int totalEffectiveLength; double meanLength;
     std::vector<double> windowRates;
+    std::vector<int> windowSizeMins;
     
     void printRecombReadPairStats() {
         for (int j = 0; j != windowSizeMins.size(); j++) {
@@ -71,7 +74,6 @@ public:
     
 private:
     // Size windows are 0 - 1000bp, 1001 - 2000 bp, 2000 - 5000bp, 5000 - 10000, 10000 - 100000, 100000 - 1000000, 1M+
-    std::vector<int> windowSizeMins;
     std::vector<int> windowSizeMax;
     std::vector<int> numRecombsInSizeWindows;
     std::vector<int> numNonRecombsInSizeWindows;
@@ -217,14 +219,16 @@ public:
     }
     
     void adjustRecombinationProbabilities() {
-        double meanL = stats->totalEffectiveLength / (double)(stats->numDiscordant + stats->numConcordant);
-        std::cout << "meanL: " << meanL << std::endl;
+       // std::cout << "meanL: " << meanL << std::endl;
+        
+        int maxLengthWindow = stats->windowSizeMins.back();
+        
         for (int j = 0; j < allInformativePairs.size(); j++) {
             if (allInformativePairs[j]->isRecombined) {
-                if (allInformativePairs[j]->dist < meanL) {
-                    allInformativePairs[j]->probabilityRecombined = allInformativePairs[j]->dist / meanL;
-                    std::cout << "dist: " << allInformativePairs[j]->dist << std::endl;
-                    std::cout << "new p: " << allInformativePairs[j]->probabilityRecombined << std::endl;
+                if (allInformativePairs[j]->dist < maxLengthWindow) {
+                    double scaleFactor = getScalingFactorFromInterpolation(allInformativePairs[j]->dist);
+                    allInformativePairs[j]->probabilityRecombined = allInformativePairs[j]->probabilityRecombined * scaleFactor;
+                    // allInformativePairs[j]->probabilityRecombined = allInformativePairs[j]->dist / stats->meanLength;
                 }
             }
         }
@@ -259,6 +263,16 @@ private:
         if (thisReadPair->hetSites.size() == 0) num0het++;
         else if (thisReadPair->hetSites.size() == 1) num1het++;
         else num2plusHets++;
+    }
+    
+    double getScalingFactorFromInterpolation(const int thisLength) {
+        double rateAt1000bp = stats->windowRates[1];
+        double rateAt1Mbp = stats->windowRates.back();
+        double rateRatio = rateAt1Mbp/rateAt1000bp;
+        int minLength = stats->windowSizeMins[1]; int maxLength = stats->windowSizeMins.back();
+        
+        double scaleFactor = rateRatio + ((1-(rateRatio))/(maxLength-minLength)) * (thisLength - minLength); // Linear interpolation between 1Kb and 1Mb
+        return scaleFactor;
     }
     
 };
@@ -316,8 +330,9 @@ public:
         meanRate = (double)rp->stats->numDiscordant/(double)rp->stats->totalEffectiveLength;
         std::cout << "meanRecombinationRate " << meanRate << std::endl;
         
-        
-        recombIntervals.resize(rp->coveredHetPos.size() - 1); int pc = 0;
+        cummulativeRates.resize(rp->coveredHetPos.size() - 1);
+        recombIntervals.resize(rp->coveredHetPos.size() - 1);
+        int pc = 0;
         for (int j = 0; j < recombIntervals.size(); j++) {
             // Initialise the recombination fractions assuming a uniform recombination rate along the genome (this uses the per-bp rate)
             RecombInterval ri(j, meanRate, rp->coveredHetPos[j], rp->coveredHetPos[j + 1]);
@@ -327,12 +342,14 @@ public:
             if (j > 0 && j % update5pcInterval == 0) { pc += 5; printPcUpdateOnPrompt(pc); }
             // if (j % 5000 == 0) printUpdateOnPrompt(j);
         }
+        mapLength = calculateCummulativeRates();
         std::cout << std::endl;
     }; 
     
-    double meanRate;
     std::vector<RecombInterval> recombIntervals;
-    
+    double meanRate;
+    std::vector<double> cummulativeRates; // Cummulative rates in cM
+    double mapLength; // Map length in cM
     
     void printPcUpdateOnPrompt(int pc) {
         if (pc == 100) std::cout << pc << "% (DONE)" << std::endl;
@@ -343,6 +360,7 @@ public:
         std::cout << "Iteration " << EMiterationNum << ": " << std::endl;
         updatePijs();
         double delta = updateRecombFractions();
+        mapLength = calculateCummulativeRates();
         std::cout << std::endl;
         return delta;
     }
@@ -355,10 +373,31 @@ public:
     void outputMapToFile(string fileName) {
         std::ofstream* f = new std::ofstream(fileName);
         // That's just approximating the chromosome beginning; do we want it?
-        *f << "0\t" << recombIntervals[0].leftCoord << "\t" << recombIntervals[0].recombFractionPerBp << std::endl;
+        *f << "1\t" << recombIntervals[0].leftCoord << "\t" << recombIntervals[0].recombFractionPerBp << std::endl;
         // Now the actual map
         for (int i = 0; i != recombIntervals.size(); i++) {
             *f << recombIntervals[i].leftCoord << "\t" << recombIntervals[i].rightCoord << "\t" << recombIntervals[i].recombFractionPerBp << std::endl;
+        }
+    }
+    
+    void outputMapToFileFixedWindowSizes(string fileName, int windowSize) {
+        std::ofstream* f = new std::ofstream(fileName);
+        
+        vector< vector<int> > allCoordsVectors; allCoordsVectors.resize(2);
+        allCoordsVectors[0].resize(recombIntervals.size()); allCoordsVectors[1].resize(recombIntervals.size());
+        vector<double> perBPrecombinationValueVector(recombIntervals.size(),0.0);
+        for (int i = 0; i != recombIntervals.size(); i++) {
+            allCoordsVectors[0][i] = recombIntervals[i].leftCoord;
+            allCoordsVectors[1][i] = recombIntervals[i].rightCoord;
+            perBPrecombinationValueVector[i] = recombIntervals[i].recombFractionPerBp;
+        }
+        int lastCoord = allCoordsVectors[1].back();
+        int maxCoordToOutput = roundToNearestValue(lastCoord, windowSize);
+        for (int start = 1; start < maxCoordToOutput; start = start + windowSize) {
+            int physicalWindowEnd = start + windowSize - 1;
+            *f << start << "\t" << physicalWindowEnd << "\t";
+            *f << getAverageForPhysicalWindow(allCoordsVectors, perBPrecombinationValueVector, start, physicalWindowEnd);
+            *f << std::endl;
         }
     }
     
@@ -415,6 +454,51 @@ private:
         }
         std::cout << "delta: " << delta << std::endl;
         return delta;
+    }
+    
+    // Returns total map length in cM
+    double calculateCummulativeRates() {
+        double cumSum = 0;
+        for (int j = 0; j < recombIntervals.size(); j++) {
+            cummulativeRates[j] = cumSum * 100;
+            cumSum += recombIntervals[j].rj;
+        }
+        return (cumSum * 100);
+    }
+    
+    double getAverageForPhysicalWindow(const vector<vector<int>>& intervalCoordinates, const vector<double>& values, const int start, const int end) {
+        // Binary search to find the first interval whose end coordinate is greater
+        // or equal to the start of the region in question
+        vector<int>::const_iterator itStart = lower_bound(intervalCoordinates[1].begin(),intervalCoordinates[1].end(),start);
+        int numBPtotal = 0; int numBPthisInterval = 0;
+        double sumPerBPvalue = 0; double meanValue = NAN;
+        
+        if (itStart != intervalCoordinates[1].end()) {  // if (start < f[1])    ---  excludind case 1)
+            vector<int>::size_type index = std::distance(intervalCoordinates[1].begin(), itStart);
+            // Sum the lengths
+            while (intervalCoordinates[0][index] <= end && index < intervalCoordinates[0].size()) { // if (f[0] >= end)   ---    excluding case 2)
+                double valueThisInterval = values[index];
+
+              //  std::cerr << "valuesThisFeature[0]\t" << valuesThisFeature[0] << std::endl;
+                if (intervalCoordinates[0][index] < start && intervalCoordinates[1][index] <= end)
+                    numBPthisInterval = (intervalCoordinates[1][index] - start) + 1;
+                else if (intervalCoordinates[0][index] >= start && intervalCoordinates[1][index] <= end)
+                    numBPthisInterval = (intervalCoordinates[1][index] - intervalCoordinates[0][index]);
+                else if (intervalCoordinates[0][index] >= start && intervalCoordinates[1][index] > end)
+                    numBPthisInterval = (end - intervalCoordinates[0][index]);
+                else if (intervalCoordinates[0][index] < start && intervalCoordinates[1][index] > end)
+                    numBPthisInterval = (end - start) + 1;
+                
+                numBPtotal += numBPthisInterval;
+                sumPerBPvalue += valueThisInterval * numBPthisInterval;
+                index++;
+            }
+            
+                meanValue = (double)sumPerBPvalue/numBPtotal;
+            //std::cerr << "meanValue: " << meanValue << std::endl;
+        }
+        return meanValue;
+        
     }
     
 };

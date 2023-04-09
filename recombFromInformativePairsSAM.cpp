@@ -38,17 +38,20 @@ static const char *DISCORDPAIRS_USAGE_MESSAGE =
 "\n"
 "OUTPUT OPTIONS:\n"
 "       -n, --run-name=RN                       (optional) Will be included in the output file name: recombMap_RN.txt\n"
+"       -f, --fixed-window=SIZE                 (optional) Output additional file with recombination map in windows of given SIZE (in bp)\n"
+"                                               it will be output in file recombMap_RN_fW_SIZE.txt; the SIZE should be at least 1000bp\n"
 "       -c, --coverageStats=OUTFILE             (optional) Output coverage over each het site into OUTFILE.txt\n"
 "\n"
 "\nReport bugs to " PACKAGE_BUGREPORT "\n\n";
 
-static const char* shortopts = "hn:b:m:p:d:s:c:";
+static const char* shortopts = "hn:b:m:p:d:s:c:f:";
 
 //enum { OPT_ANNOT, OPT_AF  };
 
 static const struct option longopts[] = {
     { "help",   no_argument, NULL, 'h' },
     { "run-name",   required_argument, NULL, 'n' },
+    { "fixed-window",   required_argument, NULL, 'f' },
     { "min-MQ",   required_argument, NULL, 'm' },
     { "min-BQ",   required_argument, NULL, 'b' },
     { "min-PQ",   required_argument, NULL, 'p' },
@@ -69,6 +72,7 @@ namespace opt
     static int minDist = 1000;
     static string hetsSubset;
     static string coverageStatsFile;
+    static int physicalWindowSize = NAN;
 }
 
 int RecombFromSAMMain(int argc, char** argv) {
@@ -126,10 +130,12 @@ int RecombFromSAMMain(int argc, char** argv) {
     
     double delta = std::numeric_limits<double>::max(); int EMiterationNum = 0;
     std::cout << "Starting EM iterations..." << std::endl;
-   // while (delta > 0.1) {
+    while (delta > (0.0001 * rp->stats->numDiscordant)) {
         EMiterationNum++; delta = rm->EMiteration(EMiterationNum);
-    //}
+    }
+    std::cout << "DONE.... Map length = " << rm->mapLength << std::endl;
     rm->outputMapToFile("recombMap" + opt::runName + ".txt");
+    if (!isnan(opt::physicalWindowSize)) rm->outputMapToFileFixedWindowSizes("recombMap" + opt::runName + "_FW_" + numToString(opt::physicalWindowSize) + ".txt", opt::physicalWindowSize);
     
     // std::cout << "5a) Bootstrap... " << std::endl;
     
@@ -154,11 +160,17 @@ void parseRecombFromSAMOptions(int argc, char** argv) {
             case 'd': arg >> opt::minDist; break;
             case 'p': arg >> opt::minPQ; break;
             case 's': arg >> opt::hetsSubset; break;
+            case 'f': arg >> opt::physicalWindowSize; break;
             case 'c': arg >> opt::coverageStatsFile; break;
             case 'h':
                 std::cout << DISCORDPAIRS_USAGE_MESSAGE;
                 exit(EXIT_SUCCESS);
         }
+    }
+    
+    if (!isnan(opt::physicalWindowSize) && opt::physicalWindowSize < 1000) {
+        std::cerr << "Error: the -f parameter should be at least 1000 bp\n";
+        die = true;
     }
     
     if (argc - optind < 2) {

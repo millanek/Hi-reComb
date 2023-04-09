@@ -11,6 +11,9 @@
 #include <stdio.h>
 #include "generalUtils.hpp"
 
+using std::string;
+using std::vector;
+using std::map;
 
 #define SOFT_CLIP_CIGAR 'S'
 #define HARD_CLIP_CIGAR 'H'
@@ -265,6 +268,13 @@ class AllPhaseInfo {
     std::map <int, bool> subsetLoci;
     std::vector<int> phaseBlockSNPnums;
 };
+
+template <typename T> int roundToNearestValue(T num, int roundingValue)
+{
+    int d_i = num;
+    int halfRoundingValue = roundingValue/2;
+    return ((d_i % roundingValue) < halfRoundingValue) ? d_i - (d_i % roundingValue) : d_i + (roundingValue - (d_i % roundingValue));
+}
 
 inline unsigned nChoosek( unsigned n, unsigned k )
 {
