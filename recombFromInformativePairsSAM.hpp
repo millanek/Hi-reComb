@@ -222,11 +222,12 @@ public:
        // std::cout << "meanL: " << meanL << std::endl;
         
         int maxLengthWindow = stats->windowSizeMins.back();
+        double meanL_At1MbpPlus = getMeanLengthAboveThreshold(maxLengthWindow);
         
         for (int j = 0; j < allInformativePairs.size(); j++) {
             if (allInformativePairs[j]->isRecombined) {
-                if (allInformativePairs[j]->dist < maxLengthWindow) {
-                    double scaleFactor = getScalingFactorFromInterpolation(allInformativePairs[j]->dist);
+                if (allInformativePairs[j]->dist < meanL_At1MbpPlus) {
+                    double scaleFactor = getScalingFactorFromInterpolation(allInformativePairs[j]->dist, meanL_At1MbpPlus);
                     allInformativePairs[j]->probabilityRecombined = allInformativePairs[j]->probabilityRecombined * scaleFactor;
                     // allInformativePairs[j]->probabilityRecombined = allInformativePairs[j]->dist / stats->meanLength;
                 }
@@ -265,14 +266,25 @@ private:
         else num2plusHets++;
     }
     
-    double getScalingFactorFromInterpolation(const int thisLength) {
+    double getScalingFactorFromInterpolation(const int thisLength, const double meanL_At1MbpPlus) {
         double rateAt1000bp = stats->windowRates[1];
-        double rateAt1Mbp = stats->windowRates.back();
-        double rateRatio = rateAt1Mbp/rateAt1000bp;
-        int minLength = stats->windowSizeMins[1]; int maxLength = stats->windowSizeMins.back();
+        double rateAt1MbpPlus = stats->windowRates.back();
+        double rateRatio = rateAt1MbpPlus/rateAt1000bp;
+        int minLength = stats->windowSizeMins[1];
         
-        double scaleFactor = rateRatio + ((1-(rateRatio))/(maxLength-minLength)) * (thisLength - minLength); // Linear interpolation between 1Kb and 1Mb
+        double scaleFactor = rateRatio + ((1-(rateRatio))/(meanL_At1MbpPlus-minLength)) * (thisLength - minLength); // Linear interpolation between 1Kb and 1Mb
         return scaleFactor;
+    }
+    
+    double getMeanLengthAboveThreshold(const int threshold) {
+        int sumLengths = 0; int nAboveThreshold = 0;
+        for (int j = 0; j < allInformativePairs.size(); j++) {
+            if (allInformativePairs[j]->dist >= threshold) {
+                sumLengths += allInformativePairs[j]->dist; nAboveThreshold++;
+            }
+        }
+        double meanLengthAboveThreshold = (double)sumLengths/nAboveThreshold;
+        return meanLengthAboveThreshold;
     }
     
 };
