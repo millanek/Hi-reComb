@@ -159,7 +159,7 @@ class RecombRead {
 
 class DefiningRecombInfo {
     public:
-    DefiningRecombInfo(int left, int right, double qLeft, double qRight, bool isSwitch): indexLeft(-1), indexRight(-1) {
+    DefiningRecombInfo(int left, int right, double qLeft, double qRight, bool isSwitch): indexLeft(-1), indexRight(-1), sum_r_k(NAN) {
         posLeft = left;
         posRight = right;
         phaseQualLeft = qLeft;
@@ -177,6 +177,7 @@ class DefiningRecombInfo {
     int dist;
     bool isRecombined;
     double probabilityRecombined;
+    double sum_r_k;
     
     // These are the indices in a sorted vector of all informative hets long the chromosome
     // it cannot be assigned in contruction but is filled in later; -1 is just a placeholder for missing data
@@ -276,5 +277,16 @@ template <typename T> int roundToNearestValue(T num, int roundingValue)
     return ((d_i % roundingValue) < halfRoundingValue) ? d_i - (d_i % roundingValue) : d_i + (roundingValue - (d_i % roundingValue));
 }
 
+// Print an arbitrary vector to a file
+template <class T> void print_vector(T vector, std::ostream& outFile, char delim = '\t', bool endLine = true) {
+    for (int i = 0; i < vector.size(); i++) {
+        if (i == (vector.size()-1)) {
+            if (endLine) outFile << vector[i] << std::endl;
+            else outFile << vector[i];
+        } else {
+            outFile << vector[i] << delim;
+        }
+    }
+}
 
 #endif /* recombUtils_hpp */
