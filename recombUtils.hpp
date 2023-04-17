@@ -159,30 +159,27 @@ class RecombRead {
 
 class DefiningRecombInfo {
     public:
-    DefiningRecombInfo(int left, int right, double qLeft, double qRight, bool isSwitch): indexLeft(-1), indexRight(-1), sum_r_k(NAN) {
-        posLeft = left;
-        posRight = right;
-        phaseQualLeft = qLeft;
-        phaseQualRight = qRight;
-        dist = abs(right - left) + 1;
-        isRecombined = isSwitch;
+    
+    DefiningRecombInfo(HetInfo* iHet, HetInfo* jHet, int pairRecombinationStatus): indexLeft(-1), indexRight(-1), sum_r_k(NAN) {
+        posLeft = iHet->pos; posRight = jHet->pos; dist = abs(posRight - posLeft) + 1;
+        phaseQualLeft = iHet->thisPhaseQuality; phaseQualRight = jHet->thisPhaseQuality;
+        baseQualLeft = iHet->thisBaseQuality; baseQualRight = jHet->thisBaseQuality;
+        isRecombined = pairRecombinationStatus;
         if (isRecombined) probabilityRecombined = 1;
         else probabilityRecombined = 0;
-    };
+    }
     
-    int posLeft;
-    int posRight;
-    double phaseQualLeft;
-    double phaseQualRight;
+    int posLeft; int posRight;
+    double phaseQualLeft; double phaseQualRight;
+    double baseQualLeft; double baseQualRight;
     int dist;
-    bool isRecombined;
+    int isRecombined;
     double probabilityRecombined;
     double sum_r_k;
     
     // These are the indices in a sorted vector of all informative hets long the chromosome
     // it cannot be assigned in contruction but is filled in later; -1 is just a placeholder for missing data
-    int indexLeft;
-    int indexRight;
+    int indexLeft; int indexRight;
 };
 
 
@@ -228,7 +225,7 @@ class RecombReadPair {
     DefiningRecombInfo* getDefiningHetPair(const std::vector<int>& indicesI, const std::vector<int>& indicesJ);
     
 private:
-    DefiningRecombInfo* getHetPairByIndex(const std::vector<int>& indicesI, const std::vector<int>& indicesJ, const int index);
+    DefiningRecombInfo* initialiseRecombInfo(const std::vector<int>& indicesI, const std::vector<int>& indicesJ, const int index);
     
 };
 

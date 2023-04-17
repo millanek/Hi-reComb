@@ -170,7 +170,7 @@ void RecombReadPair::determineIfReadPairConcordantOrDiscordant() {
 
 DefiningRecombInfo* RecombReadPair::getDefiningHetPair(const std::vector<int>& indicesI, const std::vector<int>& indicesJ) {
     int maxD = 0; int maxDindex = 0;
-    int minD = 1000000000; int minDindex = 0;
+    int minD = std::numeric_limits<int>::max(); int minDindex = 0;
     for (int i = 0; i != indicesI.size(); i++) {
         int iPos = hetSites[indicesI[0]]->pos;
         int jPos = hetSites[indicesJ[0]]->pos;
@@ -181,30 +181,25 @@ DefiningRecombInfo* RecombReadPair::getDefiningHetPair(const std::vector<int>& i
     
     DefiningRecombInfo* thisRecombInfo;
     if (pairRecombinationStatus == PAIR_CONCORDANT) {
-        thisRecombInfo = getHetPairByIndex(indicesI, indicesJ, maxDindex);
+        thisRecombInfo = initialiseRecombInfo(indicesI, indicesJ, maxDindex);
     } else if (pairRecombinationStatus == PAIR_DISCORDANT) {
-        thisRecombInfo = getHetPairByIndex(indicesI, indicesJ, minDindex);
+        thisRecombInfo = initialiseRecombInfo(indicesI, indicesJ, minDindex);
     } else {
         assert(false);
     }
     return thisRecombInfo;
 }
 
-DefiningRecombInfo* RecombReadPair::getHetPairByIndex(const std::vector<int>& indicesI, const std::vector<int>& indicesJ, const int index) {
+DefiningRecombInfo* RecombReadPair::initialiseRecombInfo(const std::vector<int>& indicesI, const std::vector<int>& indicesJ, const int index) {
+    
     int iPos = hetSites[indicesI[index]]->pos;
     int jPos = hetSites[indicesJ[index]]->pos;
-    int iQual = hetSites[indicesI[index]]->thisPhaseQuality;
-    int jQual = hetSites[indicesJ[index]]->thisPhaseQuality;
     
-    if (jPos - iPos < 0) {
-        int tmp = iPos; iPos = jPos; jPos = tmp;
-        tmp = iQual; iQual = jQual; jQual = tmp;
-    }
-    DefiningRecombInfo* thisRecombInfo;
-    if (pairRecombinationStatus == PAIR_CONCORDANT) {
-        thisRecombInfo = new DefiningRecombInfo(iPos, jPos, iQual, jQual,false);
+    DefiningRecombInfo* recombInfo;
+    if (jPos - iPos > 0) {
+        recombInfo = new DefiningRecombInfo(hetSites[indicesI[index]], hetSites[indicesJ[index]], pairRecombinationStatus);
     } else {
-        thisRecombInfo = new DefiningRecombInfo(iPos, jPos, iQual, jQual,true);
+        recombInfo = new DefiningRecombInfo(hetSites[indicesJ[index]], hetSites[indicesI[index]], pairRecombinationStatus);
     }
-    return thisRecombInfo;
+    return recombInfo;
 }
