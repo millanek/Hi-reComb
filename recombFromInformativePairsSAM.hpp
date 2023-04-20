@@ -164,7 +164,7 @@ public:
         std::ofstream* readPairFile = new std::ofstream(fileName);
         for (int i = 0; i != allInformativePairs.size(); i++) {
             if (allInformativePairs[i]->isRecombined == switches) {
-                *readPairFile << allInformativePairs[i]->posLeft << "\t" << allInformativePairs[i]->posRight << "\t" << allInformativePairs[i]->dist << "\t" << allInformativePairs[i]->phaseQualLeft << "\t" << allInformativePairs[i]->phaseQualRight << std::endl;
+                *readPairFile << allInformativePairs[i]->posLeft << "\t" << allInformativePairs[i]->posRight << "\t" << allInformativePairs[i]->dist << "\t" << allInformativePairs[i]->phaseErrorP_left << "\t" << allInformativePairs[i]->phaseErrorP_right << std::endl;
             }
         }
     }
@@ -364,7 +364,7 @@ private:
 
 class RecombMap {
 public:
-    RecombMap(RecombReadPairs* rp) {
+    RecombMap(RecombReadPairs* rp, double minCoverageFraction) {
         // Get the mean recombination rate per bp
         meanRate = (double)rp->stats->numDiscordant/(double)rp->stats->totalEffectiveLength;
         std::cout << "meanRecombinationRate " << meanRate << std::endl;
@@ -386,7 +386,7 @@ public:
         std::cout << "recombIntervals.size() " << recombIntervals.size() << std::endl;
         
         for (int j = 0; j < recombIntervals.size(); j++) {
-            recombIntervals[j].updateVals(0.1 * meanEffectiveCoverage);
+            recombIntervals[j].updateVals(minCoverageFraction * meanEffectiveCoverage);
         }
         mapLength = calculateCummulativeRates();
         std::cout << std::endl;
@@ -403,10 +403,10 @@ public:
         else { std::cout << pc << "%..."; std::cout.flush(); }
     }
     
-    double EMiteration(const int EMiterationNum, bool bLoud = true) {
+    double EMiteration(const int EMiterationNum, const double minCoverageFraction, bool bLoud = true) {
         if (bLoud) std::cout << "Iteration " << EMiterationNum << ": " << std::endl;
         updatePijs(bLoud);
-        double delta = updateRecombFractions(0.1 * meanEffectiveCoverage, bLoud);
+        double delta = updateRecombFractions(minCoverageFraction * meanEffectiveCoverage, bLoud);
         mapLength = calculateCummulativeRates();
         if (bLoud) std::cout << std::endl;
         return delta;
@@ -418,6 +418,7 @@ public:
     }
     
     void outputMapToFile(string fileName) {
+        std::cout << "Writing recombination map into: " << fileName;
         std::ofstream* f = new std::ofstream(fileName);
         // That's just approximating the chromosome beginning; do we want it?
         *f << "1\t" << recombIntervals[0].leftCoord << "\t" << recombIntervals[0].recombFractionPerBp << std::endl;
@@ -425,9 +426,11 @@ public:
         for (int i = 0; i != recombIntervals.size(); i++) {
             *f << recombIntervals[i].leftCoord << "\t" << recombIntervals[i].rightCoord << "\t" << recombIntervals[i].recombFractionPerBp << std::endl;
         }
+        std::cout << "...DONE!" << std::endl;
     }
     
     void outputBootstrapToFile(string fileName) {
+        std::cout << "Writing bootstrapped recombination maps into:" << fileName;
         std::ofstream* f = new std::ofstream(fileName);
         // That's just approximating the chromosome beginning; do we want it?
         *f << "1\t" << recombIntervals[0].leftCoord << "\t"; print_vector(recombIntervals[0].bootstrapRecombFractions, *f);
@@ -439,6 +442,7 @@ public:
     }
     
     void outputMapToFileFixedWindowSizes(string fileName, int windowSize) {
+        std::cout << "Writing recombination map with a fixed window size of " << windowSize << "bp into:" << fileName;
         std::ofstream* f = new std::ofstream(fileName);
         
         vector< vector<int> > allCoordsVectors; allCoordsVectors.resize(2);
@@ -457,6 +461,7 @@ public:
             *f << getAverageForPhysicalWindow(allCoordsVectors, perBPrecombinationValueVector, start, physicalWindowEnd);
             *f << std::endl;
         }
+        std::cout << "...DONE!" << std::endl;
     }
     
     void printPerHetCoverageStats(string fn, RecombReadPairs* rp) {

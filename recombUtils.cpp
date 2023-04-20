@@ -203,3 +203,8 @@ DefiningRecombInfo* RecombReadPair::initialiseRecombInfo(const std::vector<int>&
     }
     return recombInfo;
 }
+
+double transformFromPhred(const double phredScore) {
+    double p = pow(10,-(phredScore/10.0));
+    return p;
+}

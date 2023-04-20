@@ -24,6 +24,7 @@
 
 #define DEBUG 1
 #define epsilon 0.0001
+#define minCoverage 0.3
 
 static const char *DISCORDPAIRS_USAGE_MESSAGE =
 "Usage: " PROGRAM_BIN " " SUBPROGRAM " [OPTIONS] hapcutBlockFile.txt INFORMATVE_PAIRS.sam\n"
@@ -79,7 +80,7 @@ namespace opt
     static string hetsSubset;
     static bool outputCoverageStats = false;
     static bool outputReadPairInfo = false;
-    static int physicalWindowSize = NAN;
+    static int physicalWindowSize = -1;
     static int nBootstrap = 0;
 }
 
@@ -135,18 +136,18 @@ int RecombFromSAMMain(int argc, char** argv) {
     rp->findBoundingHetIndicesForEachReadPair(); // For each informative read-pair, find the indices of the bounding SNPs in the sorted het vector
     
     // Now do the initial calculation of recombination fraction for each interval
-    RecombMap* rm = new RecombMap(rp);
+    RecombMap* rm = new RecombMap(rp, minCoverage);
     
     double delta = std::numeric_limits<double>::max(); int EMiterationNum = 0;
     std::cout << "Starting EM iterations..." << std::endl;
     while (delta > (epsilon * rp->stats->numDiscordant)) {
-        EMiterationNum++; delta = rm->EMiteration(EMiterationNum);
+        EMiterationNum++; delta = rm->EMiteration(EMiterationNum, minCoverage);
         std::cout << "Map length = " << rm->mapLength << std::endl;
     }
     std::cout << "DONE.... Map length = " << rm->mapLength << std::endl;
     
     rm->outputMapToFile("recombMap" + opt::runName + ".txt");
-    if (!isnan(opt::physicalWindowSize)) rm->outputMapToFileFixedWindowSizes("recombMap" + opt::runName + "_FW_" + numToString(opt::physicalWindowSize) + ".txt", opt::physicalWindowSize);
+    if (opt::physicalWindowSize != -1) rm->outputMapToFileFixedWindowSizes("recombMap" + opt::runName + "_FW_" + numToString(opt::physicalWindowSize) + ".txt", opt::physicalWindowSize);
     
      
     if (opt::nBootstrap > 0) {
@@ -164,11 +165,11 @@ int RecombFromSAMMain(int argc, char** argv) {
             rp->allInformativePairs = rp->getBootstrapSample(orginalInformativePairs);
             for (int j = 0; j < rm->recombIntervals.size(); j++) {
                 rm->recombIntervals[j].initialiseInterval(rp);
-                rm->recombIntervals[j].updateVals(0.1 * rm->meanEffectiveCoverage);
+                rm->recombIntervals[j].updateVals(minCoverage * rm->meanEffectiveCoverage);
             }
             double delta = std::numeric_limits<double>::max(); int EMiterationNum = 0;
             while (delta > (epsilon * rp->stats->numDiscordant)) {
-                EMiterationNum++; delta = rm->EMiteration(EMiterationNum, false);
+                EMiterationNum++; delta = rm->EMiteration(EMiterationNum, minCoverage, false);
                 //std::cout << "Map length = " << rm->mapLength << std::endl;
             }
             std::cout << "DONE.... Map length = " << rm->mapLength << std::endl;
@@ -209,7 +210,7 @@ void parseRecombFromSAMOptions(int argc, char** argv) {
         }
     }
     
-    if (!isnan(opt::physicalWindowSize) && opt::physicalWindowSize < 1000) {
+    if (opt::physicalWindowSize != -1 && opt::physicalWindowSize < 1000) {
         std::cerr << "Error: the -f parameter should be at least 1000 bp\n";
         die = true;
     }

@@ -25,6 +25,8 @@ using std::map;
 #define PAIR_DISCORDANT 1
 #define PAIR_AMBIGUOUS 2
 
+double transformFromPhred(const double phredScore);
+
 class HetInfo {
     public:
     HetInfo(int position, char readBase, int readBaseQuality, char phase0, char phase1, double phaseQuality, int phaseBlockIn) {
@@ -162,16 +164,25 @@ class DefiningRecombInfo {
     
     DefiningRecombInfo(HetInfo* iHet, HetInfo* jHet, int pairRecombinationStatus): indexLeft(-1), indexRight(-1), sum_r_k(NAN) {
         posLeft = iHet->pos; posRight = jHet->pos; dist = abs(posRight - posLeft) + 1;
-        phaseQualLeft = iHet->thisPhaseQuality; phaseQualRight = jHet->thisPhaseQuality;
-        baseQualLeft = iHet->thisBaseQuality; baseQualRight = jHet->thisBaseQuality;
+        phaseErrorP_left = transformFromPhred(iHet->thisPhaseQuality); phaseErrorP_right = transformFromPhred(jHet->thisPhaseQuality);
+        baseErrorP_left = transformFromPhred(iHet->thisBaseQuality); baseErrorP_right = transformFromPhred(jHet->thisBaseQuality);
         isRecombined = pairRecombinationStatus;
-        if (isRecombined) probabilityRecombined = 1;
+        if (isRecombined) { //probabilityRecombined = 1;
+            // p(ph1=T) * p(ph2=T) * p(b1=A) * p(b2=G)
+            probabilityRecombined = (1 - phaseErrorP_left) * (1 - phaseErrorP_right) * (1 - baseErrorP_left) * (1 - baseErrorP_right);
+            // p(ph1=T) * p(ph2=F) * p(b1=A) * p(b2=C)
+            probabilityRecombined += (1 - phaseErrorP_left) * phaseErrorP_right * (1 - baseErrorP_left) * baseErrorP_right;
+            // p(ph1=F) * p(ph2=T) * p(b1=T) * p(b2=G)
+            probabilityRecombined += phaseErrorP_left * (1 - phaseErrorP_right) * baseErrorP_left * (1 - baseErrorP_right);
+            // p(ph1=F) * p(ph2=F) * p(b1=T) * p(b2=C)
+            probabilityRecombined += phaseErrorP_left * phaseErrorP_right * baseErrorP_left * baseErrorP_right;
+        }
         else probabilityRecombined = 0;
     }
     
     int posLeft; int posRight;
-    double phaseQualLeft; double phaseQualRight;
-    double baseQualLeft; double baseQualRight;
+    double phaseErrorP_left; double phaseErrorP_right;
+    double baseErrorP_left; double baseErrorP_right;
     int dist;
     int isRecombined;
     double probabilityRecombined;
