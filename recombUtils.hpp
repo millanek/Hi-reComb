@@ -167,17 +167,31 @@ class DefiningRecombInfo {
         phaseErrorP_left = transformFromPhred(iHet->thisPhaseQuality); phaseErrorP_right = transformFromPhred(jHet->thisPhaseQuality);
         baseErrorP_left = transformFromPhred(iHet->thisBaseQuality); baseErrorP_right = transformFromPhred(jHet->thisBaseQuality);
         isRecombined = pairRecombinationStatus;
-        if (isRecombined) { //probabilityRecombined = 1;
+        // Given haplotypes:
+        // -------A------------------C--------------
+        // -------T------------------G--------------
+        // And a read pair called as:
+        //        A------------------G
+        // With BQ=20 and PQ=20 on both sides, we have the following probabilities:
+        // p(ph1=T) = 0.99; p(ph1=F) = 0.01
+        // p(ph2=T) = 0.99; p(ph2=F) = 0.01
+        // p(b1=A) = 0.99; p(b1=T) = 0.00333    Assuming equal probability of any base
+        // p(b2=G) = 0.99; p(b2=C) = 0.00333    Assuming equal probability of any base
+        if (isRecombined) {
             // p(ph1=T) * p(ph2=T) * p(b1=A) * p(b2=G)
             probabilityRecombined = (1 - phaseErrorP_left) * (1 - phaseErrorP_right) * (1 - baseErrorP_left) * (1 - baseErrorP_right);
             // p(ph1=T) * p(ph2=F) * p(b1=A) * p(b2=C)
-            probabilityRecombined += (1 - phaseErrorP_left) * phaseErrorP_right * (1 - baseErrorP_left) * baseErrorP_right;
+            probabilityRecombined += (1 - phaseErrorP_left) * phaseErrorP_right * (1 - baseErrorP_left) * (baseErrorP_right / 3);
             // p(ph1=F) * p(ph2=T) * p(b1=T) * p(b2=G)
-            probabilityRecombined += phaseErrorP_left * (1 - phaseErrorP_right) * baseErrorP_left * (1 - baseErrorP_right);
+            probabilityRecombined += phaseErrorP_left * (1 - phaseErrorP_right) * (baseErrorP_left / 3) * (1 - baseErrorP_right);
             // p(ph1=F) * p(ph2=F) * p(b1=T) * p(b2=C)
-            probabilityRecombined += phaseErrorP_left * phaseErrorP_right * baseErrorP_left * baseErrorP_right;
+            probabilityRecombined += phaseErrorP_left * phaseErrorP_right * (baseErrorP_left / 3) * (baseErrorP_right / 3);
+        } else {
+            // With a read pair called as:
+            //        A------------------C
+            // We have the following probabilities:
+            probabilityRecombined = 0;
         }
-        else probabilityRecombined = 0;
     }
     
     int posLeft; int posRight;

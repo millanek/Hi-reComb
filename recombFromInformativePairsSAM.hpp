@@ -17,15 +17,18 @@ int RecombFromSAMMain(int argc, char** argv);
 class RecombReadPairsStats {
 public:
     
-    RecombReadPairsStats(): numConcordant(0), numDiscordant(0), totalEffectiveLength(0) {
+    RecombReadPairsStats(): numConcordant(0), numDiscordant(0), totalEffectiveLength(0), meanRate(0.0) {
         windowSizeMins = {0,1000,2000,5000,10000,100000,1000000};
         windowSizeMax = {1000,2000,5000,10000,100000,1000000,1000000000};
-        numRecombsInSizeWindows.resize(windowSizeMins.size(),0);
-        numNonRecombsInSizeWindows.resize(windowSizeMins.size(),0);
+        numRecombsInSizeWindows.resize(windowSizeMins.size(),0.0);
+        numNonRecombsInSizeWindows.resize(windowSizeMins.size(),0.0);
         lengthOfInformativeSequenceWindows.resize(windowSizeMins.size(),0);
+        windowRates.resize(windowSizeMins.size(),0.0);
     }
     
-    void collectStats(std::vector<DefiningRecombInfo*>& allInformativePairs) {
+    void collectStats(const std::vector<DefiningRecombInfo*>& allInformativePairs, const bool bUptate = false) {
+        
+        if (bUptate) { resetVals();}
         
         for (int j = 0; j < allInformativePairs.size(); j++) {
             int l = allInformativePairs[j]->dist;
@@ -34,25 +37,27 @@ public:
             for (int k = 0; k < windowSizeMins.size(); k++) {
           //      std::cout << "k = " << k << std::endl;
                 if (l > windowSizeMins[k] && l <= windowSizeMax[k]) {
-                    if (allInformativePairs[j]->isRecombined) {
-                        numRecombsInSizeWindows[k]++; numDiscordant++; lengthOfInformativeSequenceWindows[k] += l; totalEffectiveLength += l;
-                    } else {
-                        numNonRecombsInSizeWindows[k]++; numConcordant++; lengthOfInformativeSequenceWindows[k] += l; totalEffectiveLength += l;
-                    }
+                    numRecombsInSizeWindows[k] += allInformativePairs[j]->probabilityRecombined;
+                    numDiscordant += allInformativePairs[j]->probabilityRecombined;
+                    numNonRecombsInSizeWindows[k] += (1 - allInformativePairs[j]->probabilityRecombined);
+                    numConcordant += (1 - allInformativePairs[j]->probabilityRecombined);
+                    lengthOfInformativeSequenceWindows[k] += l; totalEffectiveLength += l;
                 }
             }
         }
         
         for (int j = 0; j < windowSizeMins.size(); j++) {
             double thisWindowRate = (double)numRecombsInSizeWindows[j]/lengthOfInformativeSequenceWindows[j];
-            windowRates.push_back(thisWindowRate);
+            windowRates[j] = thisWindowRate;
         }
         
-        meanLength = totalEffectiveLength / (double)(numDiscordant + numConcordant);
+        meanLength = totalEffectiveLength / (double)allInformativePairs.size();
+        meanRate = numDiscordant/totalEffectiveLength;
     };
     
-    int numConcordant; int numDiscordant;
+    double numConcordant; double numDiscordant;
     long long int totalEffectiveLength; double meanLength;
+    double meanRate;
     std::vector<double> windowRates;
     std::vector<int> windowSizeMins;
     
@@ -62,7 +67,7 @@ public:
                 "; rate = " << windowRates[j] << "; n recomb = " << numRecombsInSizeWindows[j] << "; n non-recomb = " << numNonRecombsInSizeWindows[j] <<
                 "; seqLength = " << lengthOfInformativeSequenceWindows[j] << std::endl;
         }
-        std::cout << "total rate = " << (double)numDiscordant/totalEffectiveLength << "; n recomb = " << numDiscordant << "; n non-recomb = " << numConcordant << "; seqLength = " << totalEffectiveLength << std::endl;
+        std::cout << "total rate = " << meanRate << "; n recomb = " << numDiscordant << "; n non-recomb = " << numConcordant << "; seqLength = " << totalEffectiveLength << std::endl;
     }
     
     void printBasicStats() { // CURRENTLY NOT USED
@@ -75,9 +80,17 @@ public:
 private:
     // Size windows are 0 - 1000bp, 1001 - 2000 bp, 2000 - 5000bp, 5000 - 10000, 10000 - 100000, 100000 - 1000000, 1M+
     std::vector<int> windowSizeMax;
-    std::vector<int> numRecombsInSizeWindows;
-    std::vector<int> numNonRecombsInSizeWindows;
+    std::vector<double> numRecombsInSizeWindows;
+    std::vector<double> numNonRecombsInSizeWindows;
     std::vector<long long int> lengthOfInformativeSequenceWindows;
+    
+    void resetVals() {
+        std::fill(numRecombsInSizeWindows.begin(), numRecombsInSizeWindows.end(), 0.0);
+        std::fill(numNonRecombsInSizeWindows.begin(), numNonRecombsInSizeWindows.end(), 0.0);
+        std::fill(windowRates.begin(), windowRates.end(), 0.0);
+        std::fill(lengthOfInformativeSequenceWindows.begin(), lengthOfInformativeSequenceWindows.end(), 0);
+        numDiscordant = 0; numConcordant = 0; totalEffectiveLength = 0;
+    }
     
 };
 
@@ -335,13 +348,9 @@ public:
         for (int i = 0; i != rp->allInformativePairs.size(); i++) {
             if(rp->allInformativePairs[i]->posLeft <= leftCoord && rp->allInformativePairs[i]->posRight >= rightCoord){
                 coveringReadPairs.push_back(rp->allInformativePairs[i]);
-                if (rp->allInformativePairs[i]->isRecombined) {
-                    double recombFractionPerBpThisPair = (double)rp->allInformativePairs[i]->probabilityRecombined/(double)rp->allInformativePairs[i]->dist;
-                    //  double recombFractionPerBpThisPair = (double)1.0/(double)rp->allInformativePairs[i]->dist;
-                    sumRecombFractionPerBP += recombFractionPerBpThisPair;
-                } else {
-                    sumConcordantFraction++;
-                }
+                //  double recombFractionPerBpThisPair = (double)1.0/(double)rp->allInformativePairs[i]->dist;
+                sumRecombFractionPerBP += (double)rp->allInformativePairs[i]->probabilityRecombined/(double)rp->allInformativePairs[i]->dist;
+                sumConcordantFraction += 1 - rp->allInformativePairs[i]->probabilityRecombined;
             }
         }
     }
@@ -366,7 +375,7 @@ class RecombMap {
 public:
     RecombMap(RecombReadPairs* rp, double minCoverageFraction) {
         // Get the mean recombination rate per bp
-        meanRate = (double)rp->stats->numDiscordant/(double)rp->stats->totalEffectiveLength;
+        meanRate = rp->stats->meanRate;
         std::cout << "meanRecombinationRate " << meanRate << std::endl;
         
         cummulativeRates.resize(rp->coveredHetPos.size() - 1);
@@ -439,6 +448,7 @@ public:
             *f << recombIntervals[i].leftCoord << "\t" << recombIntervals[i].rightCoord << "\t";
             print_vector(recombIntervals[i].bootstrapRecombFractions, *f);
         }
+        std::cout << "...DONE!" << std::endl;
     }
     
     void outputMapToFileFixedWindowSizes(string fileName, int windowSize) {
@@ -488,8 +498,7 @@ private:
                     i->coveringReadPairs[r]->sum_r_k += recombIntervals[k].rj;
                 }
             }
-            double sum_r_k = i->coveringReadPairs[r]->sum_r_k;
-            double p_ij = (i->rj *  i->coveringReadPairs[r]->probabilityRecombined) / sum_r_k;  // eq. (2) from proposal
+            double p_ij = (i->rj *  i->coveringReadPairs[r]->probabilityRecombined) / i->coveringReadPairs[r]->sum_r_k;  // eq. (2) from proposal
             i->sum_P_ij += p_ij;
         }
     }
@@ -521,6 +530,10 @@ private:
             
             if (recombIntervals[j].effectiveCoverage > minCoverage) {
                 newRj = recombIntervals[j].sum_P_ij / recombIntervals[j].sumConcordantFraction;
+            } else if (recombIntervals[j].effectiveCoverage > 5) {
+                newRj = weighedAverageRateUnderCoveringReads(recombIntervals[j].coveringReadPairs) * recombIntervals[j].dj;
+               // std::cout << "newRj: " << newRj << std::endl;
+               // std::cout << "newRj/ recombIntervals[j].dj: " << newRj/ recombIntervals[j].dj << std::endl;
             } else {
                 newRj = meanRate * recombIntervals[j].dj;
             }
@@ -530,6 +543,25 @@ private:
         }
         if (bLoud) std::cout << "delta: " << delta << std::endl;
         return delta;
+    }
+    
+    double weighedAverageRateUnderCoveringReads(std::vector<DefiningRecombInfo*>& coveringReadPairs) {
+        std::vector<int> coverageCounts; coverageCounts.resize(recombIntervals.size(),0);
+        for (int i = 0; i < coveringReadPairs.size(); i++) {
+            for (int j = coveringReadPairs[i]->indexLeft; j < coveringReadPairs[i]->indexRight; j++) {
+                coverageCounts[j]++;
+            }
+        }
+        
+        double sumRecomb = 0; double sumLengths = 0;
+        for (int j = 0; j < recombIntervals.size();j++) {
+            sumRecomb += recombIntervals[j].rj * coverageCounts[j];
+            sumLengths += recombIntervals[j].dj * coverageCounts[j];
+        }
+        double weighedAvgRate = sumRecomb/sumLengths;
+       // std::cout << "vector_sum(coverageCounts): " << vector_sum(coverageCounts) << std::endl;
+       // std::cout << "weighedAvgRate: " << weighedAvgRate << std::endl;
+        return weighedAvgRate;
     }
     
     // Returns total map length in cM

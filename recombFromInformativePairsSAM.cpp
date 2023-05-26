@@ -24,7 +24,7 @@
 
 #define DEBUG 1
 #define epsilon 0.0001
-#define minCoverage 0.3
+#define minCoverage 0.2
 
 static const char *DISCORDPAIRS_USAGE_MESSAGE =
 "Usage: " PROGRAM_BIN " " SUBPROGRAM " [OPTIONS] hapcutBlockFile.txt INFORMATVE_PAIRS.sam\n"
@@ -123,8 +123,12 @@ int RecombFromSAMMain(int argc, char** argv) {
         }
     }
     rp->stats->collectStats(rp->allInformativePairs);
+    std::cout << "Initial stats: " << std::endl;
     rp->stats->printRecombReadPairStats();
-    rp->adjustRecombinationProbabilities(); // Adjust probabilities based on read-length distrubutions
+    rp->adjustRecombinationProbabilities(); // Adjust probabilities based on read-length distributions
+    rp->stats->collectStats(rp->allInformativePairs, true);
+    std::cout << "Adjusted stats: " << std::endl;
+    rp->stats->printRecombReadPairStats();
     if (opt::outputReadPairInfo) {
         rp->printReadPairFileInfoIntoFile("switches" + opt::runName + ".txt", true);
         rp->printReadPairFileInfoIntoFile("concords" + opt::runName + ".txt", false);
