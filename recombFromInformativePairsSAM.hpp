@@ -232,6 +232,36 @@ public:
         return bootstrapSample;
     }
     
+    void considerDoubleCrossovers() {
+        for (int j = 0; j < allInformativePairs.size(); j++) {
+            double lambda = stats->meanRate * allInformativePairs[j]->dist;
+            if(lambda > 1) {
+                std::cerr << "WARNING: This looks very suspicious..." << std::endl;
+                std::cerr << "stats->meanRate: " << stats->meanRate << std::endl;
+                std::cerr << "allInformativePairs[j]->dist: " << allInformativePairs[j]->dist << std::endl;
+                std::cerr << "lambda: " << lambda << std::endl;
+                std::cerr << std::endl;
+            }
+                        
+            double doubleCrossoverProbability;
+            if (allInformativePairs[j]->dist > 1000000) {
+                // Poisson Probability mass function using the mean rate
+                // not worried for now about triple and more crossover
+                doubleCrossoverProbability = (pow(lambda, 2.0) * exp(-lambda)) / 2.0;
+            } else {
+                // If distance is less than 1Mb, we set double crossover to zero because of crossover interference
+                doubleCrossoverProbability = 0;
+            }
+            
+            if (!allInformativePairs[j]->isRecombined) {
+                // p(ph1=T) * p(ph2=T) * p(b1=A) * p(b2=C)
+                // and a double cross-over probability:
+                allInformativePairs[j]->probabilityRecombined += (1 - allInformativePairs[j]->phaseErrorP_left) * (1 - allInformativePairs[j]->phaseErrorP_right) * (1 - allInformativePairs[j]->baseErrorP_left) * (1 - allInformativePairs[j]->baseErrorP_right) * (doubleCrossoverProbability);
+            }
+        }
+    }
+    
+    
     void adjustRecombinationProbabilities() {
        // std::cout << "meanL: " << meanL << std::endl;
         

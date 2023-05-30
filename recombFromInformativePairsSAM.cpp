@@ -31,11 +31,11 @@ static const char *DISCORDPAIRS_USAGE_MESSAGE =
 "Generate a recombination map from a phased hapcut2 file of heterozygous sites and a sam file with read pairs covering the hets\n"
 "\n"
 "       -h, --help                              display this help and exit\n"
-"       -m, --min-MQ                            (default: 20) the minimum mapping quality for a read to be considered\n"
+//"       -m, --min-MQ                            (default: 20) the minimum mapping quality for a read to be considered\n"
 "       -q, --min-BQ                            (default: 30) the minimum base quality for assesssing discordant phase\n"
 "       -d, --min-Dist                          (default: 1000) the minimum distance (bp) to consider discordant phase a recombination\n"
 "                                               as opposed to gene conversion\n"
-"       -p, --min-PQ                            (default: 0) the minimum phase quality for assesssing discordant phase\n"
+"       -p, --min-PQ                            (default: 10) the minimum phase quality for assesssing discordant phase\n"
 "       -s, --subsetHets=FILE.txt               (optional) Exclude the sites specified in this file\n"
 "\n"
 "OUTPUT OPTIONS:\n"
@@ -75,7 +75,7 @@ namespace opt
     static string runName = "";
     static int minMQ = 20;
     static int minBQ = 30;
-    static int minPQ = 0;
+    static int minPQ = 10;
     static int minDist = 1000;
     static string hetsSubset;
     static bool outputCoverageStats = false;
@@ -125,6 +125,7 @@ int RecombFromSAMMain(int argc, char** argv) {
     rp->stats->collectStats(rp->allInformativePairs);
     std::cout << "Initial stats: " << std::endl;
     rp->stats->printRecombReadPairStats();
+    rp->considerDoubleCrossovers();
     rp->adjustRecombinationProbabilities(); // Adjust probabilities based on read-length distributions
     rp->stats->collectStats(rp->allInformativePairs, true);
     std::cout << "Adjusted stats: " << std::endl;

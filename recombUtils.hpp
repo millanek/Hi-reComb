@@ -180,17 +180,26 @@ class DefiningRecombInfo {
         if (isRecombined) {
             // p(ph1=T) * p(ph2=T) * p(b1=A) * p(b2=G)
             probabilityRecombined = (1 - phaseErrorP_left) * (1 - phaseErrorP_right) * (1 - baseErrorP_left) * (1 - baseErrorP_right);
+            // p(ph1=T) * p(ph2=T) * p(b1=T) * p(b2=C)
+            probabilityRecombined += (1 - phaseErrorP_left) * (1 - phaseErrorP_right) * (baseErrorP_left / 3) * (baseErrorP_right / 3);
             // p(ph1=T) * p(ph2=F) * p(b1=A) * p(b2=C)
             probabilityRecombined += (1 - phaseErrorP_left) * phaseErrorP_right * (1 - baseErrorP_left) * (baseErrorP_right / 3);
             // p(ph1=F) * p(ph2=T) * p(b1=T) * p(b2=G)
             probabilityRecombined += phaseErrorP_left * (1 - phaseErrorP_right) * (baseErrorP_left / 3) * (1 - baseErrorP_right);
-            // p(ph1=F) * p(ph2=F) * p(b1=T) * p(b2=C)
-            probabilityRecombined += phaseErrorP_left * phaseErrorP_right * (baseErrorP_left / 3) * (baseErrorP_right / 3);
         } else {
             // With a read pair called as:
             //        A------------------C
             // We have the following probabilities:
-            probabilityRecombined = 0;
+            // p(ph1=T) * p(ph2=T) * p(b1=A) * p(b2=G)
+            probabilityRecombined += (1 - phaseErrorP_left) * (1 - phaseErrorP_right) * (1 - baseErrorP_left) * (baseErrorP_right / 3);
+            // p(ph1=T) * p(ph2=T) * p(b1=T) * p(b2=C)
+            probabilityRecombined += (1 - phaseErrorP_left) * (1 - phaseErrorP_right) * (baseErrorP_left / 3) * (1 - baseErrorP_right);
+            // p(ph1=F) * p(ph2=T) * p(b1=A) * p(b2=C)
+            probabilityRecombined = phaseErrorP_left * (1 - phaseErrorP_right) * (1 - baseErrorP_left) * (1 - baseErrorP_right);
+            // p(ph1=T) * p(ph2=F) * p(b1=A) * p(b2=C)
+            probabilityRecombined += (1 - phaseErrorP_left) * phaseErrorP_right * (1 - baseErrorP_left) * (1 - baseErrorP_right);
+            
+            //probabilityRecombined = 0;
         }
     }
     
