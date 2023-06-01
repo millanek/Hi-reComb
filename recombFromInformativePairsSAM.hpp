@@ -567,7 +567,7 @@ private:
             } else {
                 newRj = meanRate * recombIntervals[j].dj;
             }
-            delta += abs(newRj - recombIntervals[j].rj);
+            delta += std::abs(newRj - recombIntervals[j].rj);
             recombIntervals[j].rj = newRj;
             recombIntervals[j].recombFractionPerBp = recombIntervals[j].rj / recombIntervals[j].dj;
         }
