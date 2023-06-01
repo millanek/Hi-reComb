@@ -522,7 +522,7 @@ private:
         i->sum_P_ij = 0;
         for (int r = 0; r < i->coveringReadPairs.size(); r++) {
             if (!i->coveringReadPairs[r]->isRecombined) continue;
-            if (isnan(i->coveringReadPairs[r]->sum_r_k)) {
+            if (std::isnan(i->coveringReadPairs[r]->sum_r_k)) {
                 i->coveringReadPairs[r]->sum_r_k = 0;
                 for (int k = i->coveringReadPairs[r]->indexLeft; k < i->coveringReadPairs[r]->indexRight; k++) {
                     i->coveringReadPairs[r]->sum_r_k += recombIntervals[k].rj;
