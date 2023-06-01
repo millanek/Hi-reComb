@@ -235,7 +235,7 @@ public:
     void considerDoubleCrossovers() {
         for (int j = 0; j < allInformativePairs.size(); j++) {
             double lambda = stats->meanRate * allInformativePairs[j]->dist;
-            if(lambda > 1) {
+            if(lambda > 3) {
                 std::cerr << "WARNING: This looks very suspicious..." << std::endl;
                 std::cerr << "stats->meanRate: " << stats->meanRate << std::endl;
                 std::cerr << "allInformativePairs[j]->dist: " << allInformativePairs[j]->dist << std::endl;
