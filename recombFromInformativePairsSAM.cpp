@@ -23,7 +23,6 @@
 #define SUBPROGRAM "RecombMap"
 
 #define DEBUG 1
-#define epsilon 0.0001
 #define minCoverage 0.2
 
 static const char *DISCORDPAIRS_USAGE_MESSAGE =
@@ -35,6 +34,8 @@ HelpOption RunNameOption
 "       -q, --min-BQ                            (default: 30) the minimum base quality for assesssing discordant phase\n"
 "       -d, --min-Dist                          (default: 1000) the minimum distance (bp) to consider discordant phase a recombination\n"
 "                                               as opposed to gene conversion\n"
+"       -e, --epsilon=NUM                       (default: 0.0001) sets when the EM algorithm is deemed to have converged\n"
+"                                               the smaller the epsilon the more EM iterations will be run\n"
 "       -p, --min-PQ                            (default: 10) the minimum phase quality for assesssing discordant phase\n"
 "       -s, --subsetHets=FILE.txt               (optional) Exclude the sites specified in this file\n"
 "\n"
@@ -48,7 +49,7 @@ HelpOption RunNameOption
 "\n"
 "\nReport bugs to " PACKAGE_BUGREPORT "\n\n";
 
-static const char* shortopts = "hn:q:m:p:d:s:f:crb:";
+static const char* shortopts = "hn:q:m:p:d:s:f:crb:e:";
 
 //enum { OPT_ANNOT, OPT_AF  };
 
@@ -64,6 +65,7 @@ static const struct option longopts[] = {
     { "coverageStats",   no_argument, NULL, 'c' },
     { "readPairInfo",   no_argument, NULL, 'r' },
     { "bootstrap",   required_argument, NULL, 'b' },
+    { "epsilon",   required_argument, NULL, 'e' },
     { NULL, 0, NULL, 0 }
 };
 
@@ -81,6 +83,7 @@ namespace opt
     static bool outputReadPairInfo = false;
     static int physicalWindowSize = -1;
     static int nBootstrap = 0;
+    static double epsilon = 0.0001;
 }
 
 int RecombFromSAMMain(int argc, char** argv) {
@@ -144,7 +147,7 @@ int RecombFromSAMMain(int argc, char** argv) {
     
     double delta = std::numeric_limits<double>::max(); int EMiterationNum = 0;
     std::cout << "Starting EM iterations..." << std::endl;
-    while (delta > (epsilon * rp->stats->numDiscordant)) {
+    while (delta > (opt::epsilon * rp->stats->numDiscordant)) {
         EMiterationNum++; delta = rm->EMiteration(EMiterationNum, minCoverage);
         std::cout << "Map length = " << rm->mapLength << std::endl;
     }
@@ -172,7 +175,7 @@ int RecombFromSAMMain(int argc, char** argv) {
                 rm->recombIntervals[j].updateVals(minCoverage * rm->meanEffectiveCoverage);
             }
             double delta = std::numeric_limits<double>::max(); int EMiterationNum = 0;
-            while (delta > (epsilon * rp->stats->numDiscordant)) {
+            while (delta > (opt::epsilon * rp->stats->numDiscordant)) {
                 EMiterationNum++; delta = rm->EMiteration(EMiterationNum, minCoverage, false);
                 //std::cout << "Map length = " << rm->mapLength << std::endl;
             }
@@ -208,6 +211,7 @@ void parseRecombFromSAMOptions(int argc, char** argv) {
             case 'c': opt::outputCoverageStats = true; break;
             case 'r': opt::outputReadPairInfo = true; break;
             case 'b': arg >> opt::nBootstrap; break;
+            case 'e': arg >> opt::epsilon; break;
             case 'h':
                 std::cout << DISCORDPAIRS_USAGE_MESSAGE;
                 exit(EXIT_SUCCESS);
