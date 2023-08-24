@@ -535,11 +535,11 @@ private:
     
     void updatePijs(bool bLoud = true) {
        // std::cout << "Updating p_ij values: " << std::endl;
-        int pc = 0;
+        int pc = 0; int update5pcInterval = (int)recombIntervals.size() / 20;
+        if (bLoud) std::cout << "Updating p_ij values: ";
         for (int j = 0; j < recombIntervals.size(); j++) {
             getSumPijForInterval(j);
             
-            int update5pcInterval = (int)recombIntervals.size() / 20;
             if (bLoud) if (j > 0 && j % update5pcInterval == 0) { pc += 5; printPcUpdateOnPrompt(pc); }
         }
         
@@ -555,8 +555,11 @@ private:
     double updateRecombFractions(const double minCoverage, bool bLoud = true) {
         // std::cout << "Updating recombination fractions: " << std::endl;
         double delta = 0;
+        int pc = 0; int update5pcInterval = (int)recombIntervals.size() / 20;
+        if (bLoud) std::cout << "Updating recombination fractions: ";
         for (int j = 0; j < recombIntervals.size(); j++) {
             double newRj;
+            if (bLoud) if (j > 0 && j % update5pcInterval == 0) { pc += 5; printPcUpdateOnPrompt(pc); }
             
             if (recombIntervals[j].effectiveCoverage > minCoverage) {
                 newRj = recombIntervals[j].sum_P_ij / recombIntervals[j].sumConcordantFraction;
