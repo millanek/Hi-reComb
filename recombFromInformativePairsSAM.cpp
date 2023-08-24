@@ -147,7 +147,7 @@ int RecombFromSAMMain(int argc, char** argv) {
     
     double delta = std::numeric_limits<double>::max(); int EMiterationNum = 0;
     std::cout << "Starting EM iterations..." << std::endl;
-    while (delta > (opt::epsilon * rp->stats->numDiscordant)) {
+    while (delta > (opt::epsilon * rp->stats->numDiscordant) && EMiterationNum < 10) {
         EMiterationNum++; delta = rm->EMiteration(EMiterationNum, minCoverage);
         std::cout << "Map length = " << rm->mapLength << std::endl;
     }
@@ -175,7 +175,7 @@ int RecombFromSAMMain(int argc, char** argv) {
                 rm->recombIntervals[j].updateVals(minCoverage * rm->meanEffectiveCoverage);
             }
             double delta = std::numeric_limits<double>::max(); int EMiterationNum = 0;
-            while (delta > (opt::epsilon * rp->stats->numDiscordant)) {
+            while (delta > (opt::epsilon * rp->stats->numDiscordant) && EMiterationNum < 10) {
                 EMiterationNum++; delta = rm->EMiteration(EMiterationNum, minCoverage, false);
                 //std::cout << "Map length = " << rm->mapLength << std::endl;
             }
