@@ -19,6 +19,7 @@
 #include <assert.h>
 #include <algorithm>
 #include <random>
+#include <ctime>
 #include "gzstream.hpp"
 
 using std::string;
