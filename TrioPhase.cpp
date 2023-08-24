@@ -55,7 +55,7 @@ int trioPhaseMain(int argc, char** argv) {
     string line; // for reading the input files
     std::istream* offspringVcfFile = createReader(opt::offspringVcfFile.c_str());
     std::istream* parentsVcfFile = createReader(opt::parentsVcfFile.c_str());
-    std::ostream* outFilePhasedHets = createWriter("phasedHets.txt");
+    std::ostream* outFilePhasedHets = createWriter(opt::runName + "_phasedHets.txt");
     std::cerr << "INFO: Loading the offspring VCF file...";
     while (getline(*offspringVcfFile, line)) {
         line.erase(std::remove(line.begin(), line.end(), '\r'), line.end()); // Deal with any left over \r from files prepared on Windows
