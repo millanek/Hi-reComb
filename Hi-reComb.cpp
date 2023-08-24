@@ -15,6 +15,8 @@
 #include "generalUtils.hpp"
 #include "recombFromInformativePairsSAM.hpp"
 #include "findInformativePairs.hpp"
+#include "countMendelianViolations.hpp"
+#include "TrioPhase.hpp"
 
 
 #define AUTHOR "Milan Malinsky"
@@ -34,6 +36,9 @@ static const char *USAGE_MESSAGE =
 "Commands:\n"
 "           FindInfoPairs       Find read pairs that would be informative for estimating the recombination\n"
 "           RecombMap           Estimate the recombination map from informative Hi-C read pairs\n"
+"Extra tools:\n"
+"           CountViolations     \n"
+"           TrioPhase     \n"
 "\nReport bugs to " PACKAGE_BUGREPORT "\n\n";
 
 int main(int argc, char **argv) {
@@ -61,6 +66,10 @@ int main(int argc, char **argv) {
             RecombFromSAMMain(argc - 1, argv + 1);
         else if(command == "FindInfoPairs")
             InfoReadsMain(argc - 1, argv + 1);
+        else if (command == "CountViolations")
+            vioMain(argc - 1, argv + 1);
+        else if (command == "TrioPhase")
+            trioPhaseMain(argc - 1, argv + 1);
         else
         {
             std::cerr << "Unrecognized command: " << command << "\n";

@@ -30,7 +30,7 @@ static const char *DISCORDPAIRS_USAGE_MESSAGE =
 "Usage: " PROGRAM_BIN " " SUBPROGRAM " [OPTIONS] hapcutBlockFile.txt INFORMATVE_PAIRS.sam\n"
 "Generate a recombination map from a phased hapcut2 file of heterozygous sites and a sam file with read pairs covering the hets\n"
 "\n"
-"       -h, --help                              display this help and exit\n"
+HelpOption RunNameOption
 //"       -m, --min-MQ                            (default: 20) the minimum mapping quality for a read to be considered\n"
 "       -q, --min-BQ                            (default: 30) the minimum base quality for assesssing discordant phase\n"
 "       -d, --min-Dist                          (default: 1000) the minimum distance (bp) to consider discordant phase a recombination\n"
@@ -39,7 +39,6 @@ static const char *DISCORDPAIRS_USAGE_MESSAGE =
 "       -s, --subsetHets=FILE.txt               (optional) Exclude the sites specified in this file\n"
 "\n"
 "OUTPUT OPTIONS:\n"
-"       -n, --run-name=RN                       (optional) Will be included in the output file name: recombMap_RN.txt\n"
 "       -f, --fixed-window=SIZE                 (optional) Output additional file with recombination map in windows of given SIZE (in bp)\n"
 "                                               it will be output in file recombMap_RN_fW_SIZE.txt; the SIZE should be at least 1000bp\n"
 "       -c, --coverageStats                     (optional) Output coverage over each het site into recombMap_wDepth_RN.txt\n"
