@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <random>
 #include <ctime>
+#include <cmath>
 #include "gzstream.hpp"
 
 using std::string;
@@ -121,5 +122,29 @@ inline char getAllele(const string& gt, const int alleleNum, const VariantInfo& 
     else allele = v.altAlleles[0][0];
     return allele;
 }
+
+// -------------------------------------    BASIC MATH/STATS  ----------------------------------------
+
+// factorial(x): (x! for non-negative integer x) is defined to be gamma(x+1) (as in R)
+inline double factorial(double num) {
+    if (num < 0) {
+        std::cerr << "Can't compute factorial of a negative number " << num << std::endl;
+        exit(1);
+    }
+    return tgamma(num+1);
+}
+
+// Calculates the binomial coefficient (n choose k)
+inline int choose(int n, int k) {
+    double dResult = factorial(n)/(factorial(k)*factorial(n-k));
+    int iResult = (int)round(dResult);
+    return iResult;
+}
+
+inline long double binomialPMF(const int k, const int n, const double p) {
+    return choose(n,k) * pow(p,k) * pow(1  - p, n - k);
+}
+
+
 
 #endif /* generalUtils_hpp */

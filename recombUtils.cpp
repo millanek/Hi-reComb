@@ -140,8 +140,8 @@ void RecombReadPair::filterHetsByBlock(int blockNum) {
 }
 
 void RecombReadPair::findIndicesOfConcordantAndDiscordantPairsOfHets(const int minDistance) {
-    for (int i = 0; i < hetSites.size() - 1; i++) {
-        for (int j = 1; j < hetSites.size(); j++) {
+    for (int i = 0; i < hetSites.size(); ++i) {
+        for (int j = i + 1; j < hetSites.size(); ++j) {
             if (hetSites[i]->phaseBlock == hetSites[j]->phaseBlock) {
                 int phaseI = hetSites[i]->thisHetPhase01;
                 int phaseJ = hetSites[j]->thisHetPhase01;
@@ -164,6 +164,8 @@ void RecombReadPair::determineIfReadPairConcordantOrDiscordant() {
         pairRecombinationStatus = PAIR_DISCORDANT;
     else if (concordPairI.size() > 0 && switchPairI.size() == 0)
         pairRecombinationStatus = PAIR_CONCORDANT;
+    else if (concordPairI.size() == 0 && switchPairI.size() == 0)
+        pairRecombinationStatus = PAIR_TOO_SHORT;
     else
         pairRecombinationStatus = PAIR_AMBIGUOUS;
 }

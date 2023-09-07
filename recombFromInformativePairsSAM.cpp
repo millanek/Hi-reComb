@@ -23,7 +23,6 @@
 #define SUBPROGRAM "RecombMap"
 
 #define DEBUG 1
-#define minCoverage 0.2
 
 static const char *DISCORDPAIRS_USAGE_MESSAGE =
 "Usage: " PROGRAM_BIN " " SUBPROGRAM " [OPTIONS] hapcutBlockFile.txt INFORMATVE_PAIRS.sam\n"
@@ -83,7 +82,12 @@ namespace opt
     static bool outputReadPairInfo = false;
     static int physicalWindowSize = -1;
     static int nBootstrap = 0;
-    static double epsilon = 0.0001;
+    static double epsilon = 0.00001;
+
+    // These are fixed for now
+    static int maxEMiterations = 10;
+    static double minCoverage = 0.25;
+    static int minDistanceToDefinePairs = 200;
 }
 
 int RecombFromSAMMain(int argc, char** argv) {
@@ -94,77 +98,77 @@ int RecombFromSAMMain(int argc, char** argv) {
     std::cout << std::endl;
     
     std::cout << "2) Loading read-pairs... " << std::endl;
-    RecombReadPairs* rp = new RecombReadPairs(opt::samFile);
+    RecombReadPairs* rp = new RecombReadPairs(opt::samFile, opt::minDistanceToDefinePairs);
     std::cout << std::endl;
     
     std::cout << "3) Linking read-pairs and phased hets... " << std::endl;
     rp->linkWithHets(p->posToPhase, p->subsetLoci, opt::minBQ);
     rp->printBaseQualityStats();
-    rp->printReadPairStats();
+    rp->printReadPairStatsByHetNumbers();
     
     std::cout << "4) Categorising concordant-discordant read-pairs... " << std::endl;
-    // Now consider all HiC pairs i that map to the chromosome and cover a het at each end - lets call the physical locations of the hets x_i, y_i ( x < y) and let Z_i = 1 if they are in phase, 0 if out of phase (recombined)
-    // Prod_i ((1-Z_i)(G(y_i)-G(x_i)) + Z_i*(1 -(G(y_i)-G(x_i))
+    rp->categorisePairs(opt::minDistanceToDefinePairs);
+    rp->printReadPairStatsByCategory(opt::minDistanceToDefinePairs); rp->stats->collectAndPrintStats("Initial rates/stats by read pair distances: ", rp->allInformativePairs, true);
+    rp->considerDoubleCrossovers(); rp->stats->collectAndPrintStats("Adjusted for double-crossovers: ", rp->allInformativePairs, true);
+    //rp->adjustRecombinationProbabilities(); // Adjust probabilities based on read-length distributions
+    rp->adjustRecombinationProbabilitiesBayes(); rp->adjustRecombinationProbabilities(); rp->stats->collectAndPrintStats("Adjusted for false positive rates: ", rp->allInformativePairs, true);
+    rp->findUniqueHetsCoveredByReadsAndSortThem(); // Find and sort informative SNPs
+    rp->removeReadPairsAboveAndBelowGivenLength(opt::minDist,0.5);
     
-    // std::vector<PhaseSwitch*> thisPairSwitches;
-    int readPairsProcessed = 0; DefiningRecombInfo* thisPairInformation;
-    for (std::vector<RecombReadPair*>::iterator it = rp->informativeReadPairs.begin(); it != rp->informativeReadPairs.end(); it++) {
-        readPairsProcessed++;
-        RecombReadPair* thisReadPair = *it;
-        
-        thisReadPair->findIndicesOfConcordantAndDiscordantPairsOfHets(opt::minDist);
-        thisReadPair->determineIfReadPairConcordantOrDiscordant();
-        
-        if (thisReadPair->pairRecombinationStatus == PAIR_DISCORDANT) {
-            thisPairInformation = thisReadPair->getDefiningHetPair(thisReadPair->switchPairI, thisReadPair->switchPairJ);
-        } else if (thisReadPair->pairRecombinationStatus == PAIR_CONCORDANT) {
-            thisPairInformation = thisReadPair->getDefiningHetPair(thisReadPair->concordPairI, thisReadPair->concordPairJ);
-        }
-        if (thisReadPair->pairRecombinationStatus != PAIR_AMBIGUOUS) {
-            rp->allInformativePairs.push_back(thisPairInformation);
-        }
-    }
-    rp->stats->collectStats(rp->allInformativePairs);
-    std::cout << "Initial stats: " << std::endl;
-    rp->stats->printRecombReadPairStats();
-    rp->considerDoubleCrossovers();
-    rp->adjustRecombinationProbabilities(); // Adjust probabilities based on read-length distributions
-    rp->stats->collectStats(rp->allInformativePairs, true);
-    std::cout << "Adjusted stats: " << std::endl;
-    rp->stats->printRecombReadPairStats();
+    rp->calculateDirectCoverageOnEachHet();
+    rp->findAndRemoveReadPairsCoveringMultiHets(opt::runName);
+    
+    rp->findWhichHetsAreUsedByFinalReadPairSet(); // For each informative read-pair, find the indices of the bounding SNPs in the sorted het vector
+    rp->findBoundingHetIndicesForEachReadPair();
+    
+    std::cout << "Left with " << rp->allInformativePairs.size() << " read pairs to build the map" << std::endl;
+    
+    rp->stats->collectAndPrintStats("Final read pair set detailed stats: ", rp->allInformativePairs, true);
+    
     if (opt::outputReadPairInfo) {
-        rp->printReadPairFileInfoIntoFile("switches" + opt::runName + ".txt", true);
-        rp->printReadPairFileInfoIntoFile("concords" + opt::runName + ".txt", false);
+        rp->printReadPairFileInfoIntoFile("discordantPairs" + opt::runName + ".txt", true);
+        rp->printReadPairFileInfoIntoFile("concordantPairs" + opt::runName + ".txt", false);
     }
     std::cout << std::endl;
+    
+    std::cout << "Probability of two discordant pairs landing on the same SNP = " << binomialPMF(2, rp->numDiscordant*2, 1.0/p->posToPhase.size())  << std::endl;
         
     std::cout << "5) Making a genetic map... " << std::endl;
-    rp->findUniqueHetsCoveredByReadsAndSortThem(); // Find and sort informative SNPs
-    rp->findBoundingHetIndicesForEachReadPair(); // For each informative read-pair, find the indices of the bounding SNPs in the sorted het vector
     
     // Now do the initial calculation of recombination fraction for each interval
-    RecombMap* rm = new RecombMap(rp, minCoverage);
+    RecombMap* rm = new RecombMap(rp, opt::minCoverage);
+    rm->firstUpdate();
     
-    double delta = std::numeric_limits<double>::max(); int EMiterationNum = 0;
-    std::cout << "Starting EM iterations..." << std::endl;
-    while (delta > (opt::epsilon * rp->stats->numDiscordant) && EMiterationNum < 10) {
-        EMiterationNum++; delta = rm->EMiteration(EMiterationNum, minCoverage);
+    rm->outputMapToFile("recombMap_initial" + opt::runName + ".txt");
+    
+    std::cout << "Starting EM iterations..." << std::endl; int EMi = 0;
+    while (rm->delta > (opt::epsilon * rp->stats->numDiscordant) && rm->EMiterationNum < opt::maxEMiterations) {
+        EMi++;
+        rm->EMiteration();
         std::cout << "Map length = " << rm->mapLength << std::endl;
+        rm->outputMapToFile("recombMap_iteration_" + numToString(EMi) + opt::runName + ".txt");
     }
     std::cout << "DONE.... Map length = " << rm->mapLength << std::endl;
     
     rm->outputMapToFile("recombMap" + opt::runName + ".txt");
     if (opt::physicalWindowSize != -1) rm->outputMapToFileFixedWindowSizes("recombMap" + opt::runName + "_FW_" + numToString(opt::physicalWindowSize) + ".txt", opt::physicalWindowSize);
     
+    // Optional: calculate and print coverage stats (effective coverage and direct coverage) per het site
+    if(opt::outputCoverageStats) rm->printPerHetCoverageStats("recombMap_wDepth" + opt::runName + ".txt", rp);
+    std::cout << "rp->coveredHetPos.size() = " << rp->coveredHetPos.size() <<std::endl;
+    std::cout << "rp->allInformativePairs.size() = " << rp->allInformativePairs.size() <<std::endl;
+    std::cout << "rm->recombIntervals.size() = " << rm->recombIntervals.size() <<std::endl;
+    
      
     if (opt::nBootstrap > 0) {
         std::cout << std::endl;
         std::cout << "5a) Bootstrap... " << std::endl;
-        std::cout << "Sample: 1" << std::endl;
-        
-        for (int j = 0; j < rm->recombIntervals.size(); j++) {
+     //   std::cout << "Sample: 1" << std::endl;
+       
+    // Add the original ma as the first sample
+       for (int j = 0; j < rm->recombIntervals.size(); j++) {
             rm->recombIntervals[j].bootstrapRecombFractions.push_back(rm->recombIntervals[j].recombFractionPerBp);
-        }
+       }
         
         std::vector<DefiningRecombInfo*> orginalInformativePairs = rp->allInformativePairs;
         for (int i = 0; i < opt::nBootstrap; i++) {
@@ -172,11 +176,12 @@ int RecombFromSAMMain(int argc, char** argv) {
             rp->allInformativePairs = rp->getBootstrapSample(orginalInformativePairs);
             for (int j = 0; j < rm->recombIntervals.size(); j++) {
                 rm->recombIntervals[j].initialiseInterval(rp);
-                rm->recombIntervals[j].updateVals(minCoverage * rm->meanEffectiveCoverage);
+                // rm->recombIntervals[j].updateVals(opt::minCoverage * rm->meanEffectiveCoverage);
             }
-            double delta = std::numeric_limits<double>::max(); int EMiterationNum = 0;
-            while (delta > (opt::epsilon * rp->stats->numDiscordant) && EMiterationNum < 10) {
-                EMiterationNum++; delta = rm->EMiteration(EMiterationNum, minCoverage, false);
+            rm->firstUpdate();
+            rm->delta = std::numeric_limits<double>::max(); rm->EMiterationNum = 0;
+            while (rm->delta > (opt::epsilon * rp->stats->numDiscordant) && rm->EMiterationNum < opt::maxEMiterations) {
+                rm->EMiteration(false);
                 //std::cout << "Map length = " << rm->mapLength << std::endl;
             }
             std::cout << "DONE.... Map length = " << rm->mapLength << std::endl;
@@ -185,10 +190,8 @@ int RecombFromSAMMain(int argc, char** argv) {
             }
             std::cout << "Sample: " << i + 1 << std::endl;
         }
-        rm->outputBootstrapToFile("bootstrap_" + opt::runName + ".txt");
+        rm->outputBootstrapToFile("bootstrap" + opt::runName + ".txt");
     }
-    // Optional: calculate and print coverage stats (effective coverage and direct coverage) per het site
-    if(opt::outputCoverageStats) rm->printPerHetCoverageStats("recombMap_wDepth" + opt::runName + ".txt", rp);
      
     return 0;
 }

@@ -17,13 +17,19 @@ int RecombFromSAMMain(int argc, char** argv);
 class RecombReadPairsStats {
 public:
     
-    RecombReadPairsStats(): numConcordant(0), numDiscordant(0), totalEffectiveLength(0), meanRate(0.0) {
-        windowSizeMins = {0,1000,2000,5000,10000,100000,1000000};
-        windowSizeMax = {1000,2000,5000,10000,100000,1000000,1000000000};
+    RecombReadPairsStats(const int minDistanceToConsider): numConcordant(0), numDiscordant(0), totalEffectiveLength(0), meanRate(0.0) {
+        windowSizeMins = {minDistanceToConsider,1000,5000,10000,100000,1000000};
+        windowSizeMax = {1000,5000,10000,100000,1000000,1000000000};
         numRecombsInSizeWindows.resize(windowSizeMins.size(),0.0);
         numNonRecombsInSizeWindows.resize(windowSizeMins.size(),0.0);
         lengthOfInformativeSequenceWindows.resize(windowSizeMins.size(),0);
         windowRates.resize(windowSizeMins.size(),0.0);
+    }
+    
+    void collectAndPrintStats(const string& msg, const std::vector<DefiningRecombInfo*>& informativeReadPairs, const bool bReset) {
+        collectStats(informativeReadPairs, bReset);
+        std::cout << msg << std::endl;
+        printRecombReadPairStats();
     }
     
     void collectStats(const std::vector<DefiningRecombInfo*>& allInformativePairs, const bool bUptate = false) {
@@ -39,9 +45,14 @@ public:
                 if (l > windowSizeMins[k] && l <= windowSizeMax[k]) {
                     numRecombsInSizeWindows[k] += allInformativePairs[j]->probabilityRecombined;
                     numDiscordant += allInformativePairs[j]->probabilityRecombined;
-                    numNonRecombsInSizeWindows[k] += (1 - allInformativePairs[j]->probabilityRecombined);
-                    numConcordant += (1 - allInformativePairs[j]->probabilityRecombined);
+                    numNonRecombsInSizeWindows[k] += (1.0 - allInformativePairs[j]->probabilityRecombined);
+                    numConcordant += (1.0 - allInformativePairs[j]->probabilityRecombined);
                     lengthOfInformativeSequenceWindows[k] += l; totalEffectiveLength += l;
+                 //   if (k == 3 || k == 4) {
+                  //      std::cout << "read pair j = " << j << "; probabilityRecombined = " << allInformativePairs[j]->probabilityRecombined << std::endl;
+                 //   }
+                    
+                    
                 }
             }
         }
@@ -63,11 +74,12 @@ public:
     
     void printRecombReadPairStats() {
         for (int j = 0; j != windowSizeMins.size(); j++) {
-            std::cout << "window: " << windowSizeMins[j] << " - " << windowSizeMax[j] <<
-                "; rate = " << windowRates[j] << "; n recomb = " << numRecombsInSizeWindows[j] << "; n non-recomb = " << numNonRecombsInSizeWindows[j] <<
+            std::cout << "Size window: " << windowSizeMins[j] << " - " << windowSizeMax[j] <<
+                "bp; rate = " << windowRates[j] << "; n recomb = " << numRecombsInSizeWindows[j] << "; n non-recomb = " << numNonRecombsInSizeWindows[j] <<
                 "; seqLength = " << lengthOfInformativeSequenceWindows[j] << std::endl;
         }
         std::cout << "total rate = " << meanRate << "; n recomb = " << numDiscordant << "; n non-recomb = " << numConcordant << "; seqLength = " << totalEffectiveLength << std::endl;
+        std::cout << std::endl;
     }
     
     void printBasicStats() { // CURRENTLY NOT USED
@@ -77,13 +89,12 @@ public:
     }
     
     
-private:
-    // Size windows are 0 - 1000bp, 1001 - 2000 bp, 2000 - 5000bp, 5000 - 10000, 10000 - 100000, 100000 - 1000000, 1M+
     std::vector<int> windowSizeMax;
     std::vector<double> numRecombsInSizeWindows;
     std::vector<double> numNonRecombsInSizeWindows;
     std::vector<long long int> lengthOfInformativeSequenceWindows;
-    
+
+private:
     void resetVals() {
         std::fill(numRecombsInSizeWindows.begin(), numRecombsInSizeWindows.end(), 0.0);
         std::fill(numNonRecombsInSizeWindows.begin(), numNonRecombsInSizeWindows.end(), 0.0);
@@ -98,7 +109,7 @@ class RecombReadPairs {
 public:
     // Parse the samtools file to find reads that match records from the pairstools file
     // and therefore  can be informative about the phasing and recombination
-    RecombReadPairs(string readFileName) {
+    RecombReadPairs(string readFileName, const int minDistanceToConsider) {
         std::ifstream* samFile = new std::ifstream(readFileName.c_str()); assertFileOpen(*samFile, readFileName);
         string line; int readN = 0;
         std::vector<RecombRead*> informativeReads;
@@ -114,10 +125,13 @@ public:
                 informativeReads.clear();
             }
         }
+        stats = new RecombReadPairsStats(minDistanceToConsider);
     };
     
     // Read Pairs
     std::vector<RecombReadPair*> readPairs;
+    int numDiscordant = 0; int numConcordant = 0; int numAmbiguous = 0; int numTooShort = 0;
+    
     std::vector<RecombReadPair*> informativeReadPairs;
     
     // Base quality stats
@@ -128,10 +142,12 @@ public:
     // Recombination stats
     std::vector<DefiningRecombInfo*> allInformativePairs;
     std::vector<DefiningRecombInfo*> bootstrappedInformativePairs;
-    RecombReadPairsStats* stats = new RecombReadPairsStats();
+    RecombReadPairsStats* stats;
     
     // Records about recombination-informative het sites
     std::vector<int> coveredHetPos;
+    std::vector<int> coveragePerHetDiscord;
+    std::vector<int> coveragePerHetConcord;
     
     void linkWithHets(const std::map<int,PhaseInfo*>& posToPhase, const std::map <int, bool>& subsetLoci, const int minBQ) {
         for (int i = 0; i < readPairs.size(); i++) {
@@ -173,6 +189,42 @@ public:
         }
     }
     
+    void categorisePairs(const int minDistanceToDefinePairs) {
+        DefiningRecombInfo* thisPairInformation;
+        for (std::vector<RecombReadPair*>::iterator it = informativeReadPairs.begin(); it != informativeReadPairs.end(); it++) {
+            RecombReadPair* thisReadPair = *it;
+            
+            thisReadPair->findIndicesOfConcordantAndDiscordantPairsOfHets(minDistanceToDefinePairs);
+            thisReadPair->determineIfReadPairConcordantOrDiscordant();
+            
+            if (thisReadPair->pairRecombinationStatus == PAIR_DISCORDANT) {
+                thisPairInformation = thisReadPair->getDefiningHetPair(thisReadPair->switchPairI, thisReadPair->switchPairJ);
+                numDiscordant++;
+            } else if (thisReadPair->pairRecombinationStatus == PAIR_CONCORDANT) {
+                thisPairInformation = thisReadPair->getDefiningHetPair(thisReadPair->concordPairI, thisReadPair->concordPairJ);
+                numConcordant++;
+            } else if (thisReadPair->pairRecombinationStatus == PAIR_TOO_SHORT) {
+                numTooShort++;
+            } else {
+                numAmbiguous++;
+                
+                /*std::cout << "Ambiguous read pair: " << std::endl;
+                for (int h = 0; h < thisReadPair->hetSites.size(); h++) {
+                    std::cout << "thisReadPair->hetSites[h]->thisHetPhase01: " << thisReadPair->hetSites[h]->thisHetPhase01 << std::endl;
+                    std::cout << "thisReadPair->hetSites[h]->pos: " << thisReadPair->hetSites[h]->pos << std::endl;
+                }
+                std::cout << "thisReadPair->concordPairI.size(): " << thisReadPair->concordPairI.size() << std::endl;
+                std::cout << "thisReadPair->switchPairI.size(): " << thisReadPair->switchPairI.size() << std::endl;
+                exit(1);
+                 */
+            }
+            if (thisReadPair->pairRecombinationStatus != PAIR_AMBIGUOUS && thisReadPair->pairRecombinationStatus != PAIR_TOO_SHORT) {
+                allInformativePairs.push_back(thisPairInformation);
+            }
+        }
+    }
+    
+    
     void printReadPairFileInfoIntoFile(const string& fileName, const bool switches) {
         std::ofstream* readPairFile = new std::ofstream(fileName);
         for (int i = 0; i != allInformativePairs.size(); i++) {
@@ -184,18 +236,29 @@ public:
     
     
     void printBaseQualityStats() {
-        std::cout << "Initial Read Pairs.size(): " << readPairs.size() << std::endl;
-        std::cout << "numMatch: " << numMatch << std::endl;
-        std::cout << "numMismatch: " << numMismatch << std::endl;
-        std::cout << "Mean mismatchBaseScores: " << vector_average(mismatchBaseScores) << std::endl;
-        std::cout << "Mean matchBaseScores: " << vector_average(matchBaseScores) << std::endl;
+        std::cout << "Initial number of read pairs = " << readPairs.size() << std::endl;
+        std::cout << std::endl;
+        std::cout << "BASE QUALITY METRICS:" << std::endl;
+        std::cout << "numMatch: " << numMatch << "; mean base score = " << vector_average(matchBaseScores) << std::endl;
+        std::cout << "numMismatch: " << numMismatch << "; mean base score = " << vector_average(mismatchBaseScores) << std::endl;
+        std::cout << std::endl;
     }
     
-    void printReadPairStats() {
-        std::cout << "num0het: " << num0het << std::endl;
-        std::cout << "num1het: " << num1het << std::endl;
-        std::cout << "num2plusHets: " << num2plusHets << std::endl;
-        std::cout << "informativeReadPairs.size(): " << informativeReadPairs.size() << std::endl;
+    void printReadPairStatsByHetNumbers() {
+        std::cout << "HET SITE LINKING METRICS:" << std::endl;
+        std::cout << "Number of read pairs with 2+ valid hets = " << num2plusHets;
+        std::cout << "; (0 het = " << num0het << ", 1 het = " << num1het << ")" << std::endl;
+        std::cout << "Number of read pairs after excluding any with sites from the -s option = " << informativeReadPairs.size() << std::endl;
+        std::cout << std::endl;
+    }
+    
+    void printReadPairStatsByCategory(const int minD) {
+        std::cout << "READ PAIR CATEGORY METRICS:" << std::endl;
+        std::cout << "Read pairs that are too short to use (below " << minD << "bp) = " << numTooShort << std::endl;
+        std::cout << "Read pairs that have multiple hets with ambiguous phasing  = " << numAmbiguous << std::endl;
+        std::cout << "Read pairs to be directly used in map estimation: " << std::endl;
+        std::cout << "Discordant (apparent recombined) read pairs = " << numDiscordant << std::endl;
+        std::cout << "Concordant read pairs = " << numConcordant << std::endl;
         std::cout << std::endl;
     }
     
@@ -204,19 +267,97 @@ public:
         std::sort(coveredHetPos.begin(), coveredHetPos.end());
         std::vector<int>::iterator it = std::unique(coveredHetPos.begin(), coveredHetPos.end());
         coveredHetPos.resize(distance(coveredHetPos.begin(),it));
-        std::cout << "coveredHetPos.size() " << coveredHetPos.size() << std::endl;
+        std::cout << "Number of heterozygous sites covered by all informative read pairs = " << coveredHetPos.size() << std::endl;
+    }
+    
+    void findWhichHetsAreUsedByFinalReadPairSet() {
         for (int i = 0; i != coveredHetPos.size(); i++) {
             hetPosToIndex[coveredHetPos[i]] = i;
         }
+        std::vector<int> usedIndices;
+        for (int i = 0; i != allInformativePairs.size(); i++) {
+            usedIndices.push_back(hetPosToIndex.at(allInformativePairs[i]->posLeft));
+            usedIndices.push_back(hetPosToIndex.at(allInformativePairs[i]->posRight));
+        }
+        std::sort(usedIndices.begin(), usedIndices.end());
+        std::vector<int>::iterator it = std::unique(usedIndices.begin(), usedIndices.end());
+        usedIndices.resize(distance(usedIndices.begin(),it));
+        std::cout << "Number of heterozygous sites covered by used informative read pairs = " << usedIndices.size() << std::endl;
         
+        std::vector<int> usedCoveredHetPos;
+        for (const int& index : usedIndices) {
+            if (index >= 0 && index < coveredHetPos.size()) {
+                usedCoveredHetPos.push_back(coveredHetPos[index]);
+            }
+        }
+        usedCoveredHetPos.erase( std::unique( usedCoveredHetPos.begin(), usedCoveredHetPos.end() ), usedCoveredHetPos.end() );
+        
+        coveredHetPos = usedCoveredHetPos;
     }
     
+    
     void findBoundingHetIndicesForEachReadPair() {
+        hetPosToIndex.clear();
+        for (int i = 0; i != coveredHetPos.size(); i++) {
+            hetPosToIndex[coveredHetPos[i]] = i;
+        }
+        std::vector<int> usedIndices;
         for (int i = 0; i != allInformativePairs.size(); i++) {
             allInformativePairs[i]->indexLeft = hetPosToIndex.at(allInformativePairs[i]->posLeft);
             allInformativePairs[i]->indexRight = hetPosToIndex.at(allInformativePairs[i]->posRight);
         }
     }
+    
+    void calculateDirectCoverageOnEachHet() {
+        coveragePerHetDiscord.resize(coveredHetPos.size());
+        coveragePerHetConcord.resize(coveredHetPos.size());
+        for (int i = 0; i != coveredHetPos.size(); i++) {
+            for (int j = 0; j != allInformativePairs.size(); j++) {
+                if(allInformativePairs[j]->posLeft == coveredHetPos[i] || allInformativePairs[j]->posRight == coveredHetPos[i]){
+                    if (allInformativePairs[j]->isRecombined) {
+                        coveragePerHetDiscord[i]++;
+                    } else {
+                        coveragePerHetConcord[i]++;
+                    }
+                }
+            }
+        }
+    }
+    
+    void findAndRemoveReadPairsCoveringMultiHets(const string& rn) {
+        
+        std::vector<int> problematicSNPs;
+        for (int i = 0; i != coveredHetPos.size(); i++) {
+            if (coveragePerHetDiscord[i] >= 2 && coveragePerHetConcord[i] == 0) problematicSNPs.push_back(coveredHetPos[i]);
+        }
+        std::ofstream* depthFile1 = new std::ofstream("recombMap_wDepth_rp" + rn + ".txt");
+        *depthFile1 << "pos" << "\t" << "directReadCoverageConcord" << "\t" << "directReadCoverageDiscord" << std::endl;
+        for (int i = 0; i != coveredHetPos.size(); i++) {
+            *depthFile1 << coveredHetPos[i] << "\t" << coveragePerHetConcord[i] << "\t" << coveragePerHetDiscord[i] << std::endl;
+        }
+        
+        std::vector<int> readPairsToRemove;
+        for (int i = 0; i != problematicSNPs.size(); i++) {
+            for (int j = 0; j != allInformativePairs.size(); j++) {
+                if((allInformativePairs[j]->posLeft == problematicSNPs[i] || allInformativePairs[j]->posRight == problematicSNPs[i])){
+                    readPairsToRemove.push_back(i);
+                }
+            }
+        }
+        
+        std::cout << "Removing " << readPairsToRemove.size() << " read pairs directly covering " << problematicSNPs.size() << " problematic SNPs " << std::endl;
+        
+        // Sort the indices in descending order so that removing elements doesn't affect the subsequent indices
+        std::sort(readPairsToRemove.begin(), readPairsToRemove.end(), std::greater<int>());
+
+        // Remove elements at specified indices
+        for (const int& index : readPairsToRemove) {
+            if (index >= 0 && index < allInformativePairs.size()) {
+                allInformativePairs.erase(allInformativePairs.begin() + index);
+            }
+        }
+    }
+    
     
     
     std::vector<DefiningRecombInfo*> getBootstrapSample(const std::vector<DefiningRecombInfo*> orginalInformativePairs) {
@@ -234,43 +375,35 @@ public:
     
     void considerDoubleCrossovers() {
         for (int j = 0; j < allInformativePairs.size(); j++) {
-            double lambda = stats->meanRate * allInformativePairs[j]->dist;
-            if(lambda > 3) {
-                std::cerr << "WARNING: This looks very suspicious..." << std::endl;
-                std::cerr << "stats->meanRate: " << stats->meanRate << std::endl;
-                std::cerr << "allInformativePairs[j]->dist: " << allInformativePairs[j]->dist << std::endl;
-                std::cerr << "lambda: " << lambda << std::endl;
-                std::cerr << std::endl;
-            }
-                        
-            double doubleCrossoverProbability;
-            if (allInformativePairs[j]->dist > 1000000) {
-                // Poisson Probability mass function using the mean rate
-                // not worried for now about triple and more crossover
-                doubleCrossoverProbability = (pow(lambda, 2.0) * exp(-lambda)) / 2.0;
-            } else {
+            if (!allInformativePairs[j]->isRecombined) { // If the read isn't recombined
+                double lambda = stats->meanRate * allInformativePairs[j]->dist;
+                if(lambda > 3) {
+                    std::cerr << "WARNING: This looks very suspicious..." << std::endl;
+                    std::cerr << "stats->meanRate: " << stats->meanRate << std::endl;
+                    std::cerr << "allInformativePairs[j]->dist: " << allInformativePairs[j]->dist << std::endl;
+                    std::cerr << "lambda: " << lambda << std::endl;
+                    std::cerr << std::endl;
+                }
+                
+                
                 // If distance is less than 1Mb, we set double crossover to zero because of crossover interference
-                doubleCrossoverProbability = 0;
-            }
-            
-            if (!allInformativePairs[j]->isRecombined) {
+                if (allInformativePairs[j]->dist > 1000000) {
+                    // Poisson Probability mass function using the mean rate
+                    // not worried for now about triple and more crossover
+                    allInformativePairs[j]->doubleCrossoverProbability = (pow(lambda, 2.0) * exp(-lambda)) / 2.0;
+                }
+                
                 // p(ph1=T) * p(ph2=T) * p(b1=A) * p(b2=C)
                 // and a double cross-over probability:
-                allInformativePairs[j]->probabilityRecombined += (1 - allInformativePairs[j]->phaseErrorP_left) * (1 - allInformativePairs[j]->phaseErrorP_right) * (1 - allInformativePairs[j]->baseErrorP_left) * (1 - allInformativePairs[j]->baseErrorP_right) * (doubleCrossoverProbability);
+                allInformativePairs[j]->probabilityRecombined += (1 - allInformativePairs[j]->phaseErrorP_left) * (1 - allInformativePairs[j]->phaseErrorP_right) * (1 - allInformativePairs[j]->baseErrorP_left) * (1 - allInformativePairs[j]->baseErrorP_right) * allInformativePairs[j]->doubleCrossoverProbability;
             }
+        
         }
     }
     
     
     void adjustRecombinationProbabilities() {
-       // std::cout << "meanL: " << meanL << std::endl;
-        
         int maxLengthWindow = stats->windowSizeMins.back();
-     //   double meanL_At1MbpPlus = getMeanLengthAboveThreshold(maxLengthWindow);
-        
-        //std::cout << "meanL: " << meanL_At1MbpPlus << std::endl;
-        // std::cout << "maxLengthWindow: " << maxLengthWindow << std::endl;
-        
         for (int j = 0; j < allInformativePairs.size(); j++) {
             if (allInformativePairs[j]->isRecombined) {
                 if (allInformativePairs[j]->dist < maxLengthWindow) {
@@ -278,9 +411,80 @@ public:
                     allInformativePairs[j]->probabilityRecombined = allInformativePairs[j]->probabilityRecombined * scaleFactor;
                     // allInformativePairs[j]->probabilityRecombined = allInformativePairs[j]->dist / stats->meanLength;
                 }
+                checkProbabilityValid(j, allInformativePairs[j]);
             }
         }
     }
+    
+    void adjustRecombinationProbabilitiesBayes() {
+       // std::cout << ": " << meanL << std::endl;
+        
+        // CALCULATE FALSE POSITIVE RATE FROM RECOMBINATION RATE DIFFERENCES IN DIFFERENT READ LENGTH BRACKETS
+        double longreadRate = stats->windowRates.back();
+        double shortreadLength = stats->lengthOfInformativeSequenceWindows.front();
+        double shortreadRecombs = stats->numRecombsInSizeWindows.front();
+        double shortreadNonRecombs = stats->numNonRecombsInSizeWindows.front();
+        
+        double expectedShortreadRecombs = longreadRate * shortreadLength;
+        
+        double falsePositiveRate = (shortreadRecombs - expectedShortreadRecombs) / (shortreadRecombs + shortreadNonRecombs);
+        
+        // ADJUST RECOMBINATION PROBABILITIES USING THE MEAN RATE FROM LONG FRAGMENTS (1Mb+) AS A PRIOR FOR ALL THE READS
+        // ALSO INCORPORATING THE OVERALL FALSE POSITIVE RATE ESTIMATE
+        for (int j = 0; j < allInformativePairs.size(); j++) {
+            if (allInformativePairs[j]->isRecombined) {
+                double PriorPrR = longreadRate * allInformativePairs[j]->dist; if (PriorPrR > 1.0) PriorPrR = 1.0;
+                double PrORgivenR = allInformativePairs[j]->probabilityRecombined;
+                double PrORgivenNR = allInformativePairs[j]->PrORgivenNR;
+                double BayesNumerator = PrORgivenR * PriorPrR;
+                double BayesDenominator = BayesNumerator + ( (falsePositiveRate+PrORgivenNR) * (1-PriorPrR) );
+                double BayesPosterior = BayesNumerator / BayesDenominator;
+                allInformativePairs[j]->probabilityRecombined = BayesPosterior;
+                
+                checkProbabilityValid(j, allInformativePairs[j]);
+            }
+        }
+    }
+    
+    void removeReadPairsAboveAndBelowGivenLength(const int minLength, const double maxLengthFractionOfChromosome = 0.5) {
+        int firstHetPos = coveredHetPos.front(); int lastHetPos = coveredHetPos.back();
+        int chrLength = lastHetPos - firstHetPos; assert(chrLength > 0);
+        std::vector<int> indicesToRemove;
+        for (int i = (int)allInformativePairs.size() - 1; i >= 0; i--) {
+            int readPairLength = allInformativePairs[i]->posRight - allInformativePairs[i]->posLeft;
+            if (readPairLength > (maxLengthFractionOfChromosome * chrLength)) indicesToRemove.push_back(i);
+        }
+        std::cout << "Removing " << indicesToRemove.size() << " read pairs because of length above " << maxLengthFractionOfChromosome;
+        std::cout << " of the chromosome (" << maxLengthFractionOfChromosome * chrLength << "bp)" << std::endl;
+        // Remove elements at specified indices
+        for (const int& index : indicesToRemove) {
+            if (index >= 0 && index < allInformativePairs.size()) {
+                allInformativePairs.erase(allInformativePairs.begin() + index);
+            }
+        }
+        
+        indicesToRemove.clear();
+        for (int i = (int)allInformativePairs.size() - 1; i >= 0; i--) {
+            int readPairLength = allInformativePairs[i]->posRight - allInformativePairs[i]->posLeft;
+            if (readPairLength < minLength) indicesToRemove.push_back(i);
+        }
+        std::cout << "Removing " << indicesToRemove.size() << " read pairs because of length below " << minLength << "bp" << std::endl;
+        // Remove elements at specified indices
+        for (const int& index : indicesToRemove) {
+            if (index >= 0 && index < allInformativePairs.size()) {
+                allInformativePairs.erase(allInformativePairs.begin() + index);
+            }
+        }
+        
+        // Update stats:
+        numConcordant = 0; numDiscordant = 0;
+        for (int i = (int)allInformativePairs.size() - 1; i >= 0; i--) {
+            if (allInformativePairs[i]->isRecombined) numDiscordant++;
+            else numConcordant++;
+        }
+        
+    }
+    
     
     
 private:
@@ -314,10 +518,10 @@ private:
     }
     
     double getScalingFactorFromInterpolation(const int thisLength, const double meanL_At1MbpPlus) {
-        double rateAt1000bp = stats->windowRates[1];
+        double rateAt1000bp = stats->windowRates.front();
         double rateAt1MbpPlus = stats->windowRates.back();
         double rateRatio = rateAt1MbpPlus/rateAt1000bp;
-        int minLength = stats->windowSizeMins[1];
+        int minLength = stats->windowSizeMins.front();
         
         double scaleFactor = rateRatio + ((1-(rateRatio))/(meanL_At1MbpPlus-minLength)) * (thisLength - minLength); // Linear interpolation between 1Kb and 1Mb
         return scaleFactor;
@@ -334,13 +538,31 @@ private:
         return meanLengthAboveThreshold;
     }
     
+    void checkProbabilityValid(const int j, const DefiningRecombInfo* dri) {
+        if (dri->probabilityRecombined < 0 || dri->probabilityRecombined > 1) {
+            std::cout << "ERROR: Recombination probability out of bounds for this read pair:" << std::endl;
+            std::cout << "read pair j = " << j << "; probabilityRecombined = " << dri->probabilityRecombined << std::endl;
+            std::cout << "allInformativePairs[j]->phaseErrorP_left = " << dri->phaseErrorP_left << std::endl;
+            std::cout << "allInformativePairs[j]->phaseErrorP_right = " << dri->phaseErrorP_right << std::endl;
+            std::cout << "allInformativePairs[j]->baseErrorP_left = " << dri->baseErrorP_left << std::endl;
+            std::cout << "allInformativePairs[j]->baseErrorP_right = " << dri->baseErrorP_right << std::endl;
+            std::cout << "allInformativePairs[j]->doubleCrossoverProbability = " << dri->doubleCrossoverProbability << std::endl;
+            std::cout << "allInformativePairs[j]->dist = " << dri->dist << std::endl;
+            std::cout << "allInformativePairs[j]->posLeft = " << dri->posLeft << std::endl;
+            std::cout << "allInformativePairs[j]->posRight = " << dri->posRight << std::endl;
+            std::cout << "allInformativePairs[j]->isRecombined = " << dri->isRecombined << std::endl;
+            //std::cout << "doubleCrossoverProbability = " << doubleCrossoverProbability << std::endl;
+            exit(1);
+        }
+    }
+    
 };
 
 class RecombInterval {
 public:
     RecombInterval() {};
     
-    RecombInterval(int leftIndex, double meanRate, RecombReadPairs* rp): directReadCoverageConcord(0), directReadCoverageDiscord(0) {
+    RecombInterval(int leftIndex, double meanRate, RecombReadPairs* rp): directReadCoverageConcord(0), directReadCoverageDiscord(0), bSufficientCoverage(false) {
         j = leftIndex;
         recombFractionPerBp = meanRate;
         leftCoord = rp->coveredHetPos[j]; rightCoord = rp->coveredHetPos[j + 1];
@@ -348,7 +570,7 @@ public:
         rj = recombFractionPerBp * dj;
         initialiseInterval(rp);
         effectiveCoverage = (int)coveringReadPairs.size();
-        getDirectCoverageOnLeftCoord();
+        getDirectCoverageOnLeftCoord(rp);
     };
     
     int j;
@@ -365,12 +587,11 @@ public:
     double sum_P_ij;
     double sumConcordantFraction;
     double sumRecombFractionPerBP;
+    bool bSufficientCoverage;
     
     void updateVals(const double minCoverage) {
-        if (coveringReadPairs.size() > minCoverage) {
-            recombFractionPerBp = sumRecombFractionPerBP/sumConcordantFraction;
-            rj = recombFractionPerBp * dj;
-        }
+        recombFractionPerBp = sumRecombFractionPerBP/sumConcordantFraction;
+        rj = recombFractionPerBp * dj;
     }
     
     void initialiseInterval(RecombReadPairs* rp) {
@@ -387,10 +608,10 @@ public:
 
 private:
     
-    void getDirectCoverageOnLeftCoord() {
-        for (int j = 0; j != coveringReadPairs.size(); j++) {
-            if(coveringReadPairs[j]->posLeft == leftCoord || coveringReadPairs[j]->posRight == leftCoord){
-                if (coveringReadPairs[j]->isRecombined) {
+    void getDirectCoverageOnLeftCoord(RecombReadPairs* rp) {
+        for (int j = 0; j != rp->allInformativePairs.size(); j++) {
+            if(rp->allInformativePairs[j]->posLeft == leftCoord || rp->allInformativePairs[j]->posRight == leftCoord){
+                if (rp->allInformativePairs[j]->isRecombined) {
                     directReadCoverageDiscord++;
                 } else {
                     directReadCoverageConcord++;
@@ -403,10 +624,10 @@ private:
 
 class RecombMap {
 public:
-    RecombMap(RecombReadPairs* rp, double minCoverageFraction) {
+    RecombMap(RecombReadPairs* rp, double minCoverageFraction): delta(std::numeric_limits<double>::max()), EMiterationNum(0)  {
         // Get the mean recombination rate per bp
         meanRate = rp->stats->meanRate;
-        std::cout << "meanRecombinationRate " << meanRate << std::endl;
+        std::cout << "Mean Recombination Rate = " << meanRate << std::endl;
         
         cummulativeRates.resize(rp->coveredHetPos.size() - 1);
         recombIntervals.resize(rp->coveredHetPos.size() - 1);
@@ -416,19 +637,12 @@ public:
             RecombInterval ri(j, meanRate, rp); // Calculate the first iteration
             recombIntervals[j] = ri;
             int update5pcInterval = (int)recombIntervals.size() / 20;
-            if (j > 0 && j % update5pcInterval == 0) { pc += 5; printPcUpdateOnPrompt(pc); }
-            // if (j % 5000 == 0) printUpdateOnPrompt(j);
+           // if (j > 0 && j % update5pcInterval == 0) { pc += 5; printPcUpdateOnPrompt(pc); }
         }
         
         meanEffectiveCoverage = calculateMeanCoverage();
-        
-        std::cout << "recombIntervals.size() " << recombIntervals.size() << std::endl;
-        
-        for (int j = 0; j < recombIntervals.size(); j++) {
-            recombIntervals[j].updateVals(minCoverageFraction * meanEffectiveCoverage);
-        }
-        mapLength = calculateCummulativeRates();
-        std::cout << std::endl;
+        std::cout << "Mean Effective Coverage = " << meanEffectiveCoverage << std::endl;
+        edgeMinimumCoverage = minCoverageFraction * meanEffectiveCoverage;
     }; 
     
     std::vector<RecombInterval> recombIntervals;
@@ -436,19 +650,68 @@ public:
     std::vector<double> cummulativeRates; // Cummulative rates in cM
     double mapLength; // Map length in cM
     double meanEffectiveCoverage;
+    double edgeMinimumCoverage;
+    
+    // Variables for the EM algorithm
+    int EMiterationNum = 0; double delta;
+    
+    void firstUpdate() {
+        for (int j = 0; j < recombIntervals.size(); j++) {
+            if (recombIntervals[j].coveringReadPairs.size() > edgeMinimumCoverage) {
+                recombIntervals[j].updateVals(edgeMinimumCoverage);
+                recombIntervals[j].bSufficientCoverage = true;
+                
+         /*      if (j > 6000 && recombIntervals[j].recombFractionPerBp < 5e-08) {
+                   std::cout << "Interval: " << j << std::endl;
+                   std::cout << "weighedAvgRate: " << recombIntervals[j].recombFractionPerBp << std::endl;
+                   std::cout << "recombIntervals[j].coveringReadPairs.size(): " << recombIntervals[j].coveringReadPairs.size() << std::endl;
+                   //std::cout << "rightMostIndex: " << rightMostIndex << std::endl;
+                   //print_vector(coverageCounts, std::cout, '\n');
+                   exit(1);
+                }
+          */
+                
+                
+            }
+        }
+        
+        std::vector<int> cannotGetAverage;
+        for (int j = 0; j < recombIntervals.size(); j++) {
+            if (recombIntervals[j].coveringReadPairs.size() <= edgeMinimumCoverage) {
+                recombIntervals[j].recombFractionPerBp = weighedAverageRateUnderCoveringReads(recombIntervals[j].coveringReadPairs, j);
+                if (recombIntervals[j].recombFractionPerBp == -1) {
+                    cannotGetAverage.push_back(j);
+                } else {
+                    recombIntervals[j].rj = recombIntervals[j].recombFractionPerBp * recombIntervals[j].dj;
+                }
+            }
+        }
+        
+        std::sort(cannotGetAverage.begin(), cannotGetAverage.end(), std::greater<int>());
+        // Remove elements at specified indices
+        for (const int& index : cannotGetAverage) {
+            if (index >= 0 && index < recombIntervals.size()) {
+                recombIntervals.erase(recombIntervals.begin() + index);
+            }
+        }
+        
+        
+        mapLength = calculateCummulativeRates();
+        std::cout << std::endl;
+    }
     
     void printPcUpdateOnPrompt(int pc) {
         if (pc == 100) std::cout << pc << "% (DONE)" << std::endl;
         else { std::cout << pc << "%..."; std::cout.flush(); }
     }
     
-    double EMiteration(const int EMiterationNum, const double minCoverageFraction, bool bLoud = true) {
+    void EMiteration(bool bLoud = true) {
+        EMiterationNum++;
         if (bLoud) std::cout << "Iteration " << EMiterationNum << ": " << std::endl;
         updatePijs(bLoud);
-        double delta = updateRecombFractions(minCoverageFraction * meanEffectiveCoverage, bLoud);
+        delta = updateRecombFractions(bLoud);
         mapLength = calculateCummulativeRates();
         if (bLoud) std::cout << std::endl;
-        return delta;
     }
     
     void printUpdateOnPrompt(int j) {
@@ -505,14 +768,20 @@ public:
     }
     
     void printPerHetCoverageStats(string fn, RecombReadPairs* rp) {
+        std::vector<int> problematicSNPs;
+        for (int i = 0; i != rp->coveredHetPos.size(); i++) {
+            
+        }
         std::ofstream* depthFile = new std::ofstream(fn);
         *depthFile << "pos" << "\t" << "ratePerBp" << "\t" << "EffectiveDepth" << "\t" << "directReadCoverageConcord" << "\t" <<
                       "directReadCoverageDiscord" << std::endl;
-        for (int i = 0; i != recombIntervals.size() - 1; i++) {
+        for (int i = 0; i != recombIntervals.size(); i++) {
             int thisHetPos = recombIntervals[i].leftCoord;
             int coveredHetEffectiveDepth = (int)recombIntervals[i].coveringReadPairs.size();
             *depthFile << thisHetPos << "\t" << recombIntervals[i].recombFractionPerBp << "\t" << coveredHetEffectiveDepth << "\t" << recombIntervals[i].directReadCoverageConcord << "\t" << recombIntervals[i].directReadCoverageDiscord << std::endl;
+            if (recombIntervals[i].directReadCoverageDiscord >= 2) problematicSNPs.push_back(thisHetPos);
         }
+        std::cout << "There are = " << problematicSNPs.size() << " problematic intervals with directly covering read pairs" << std::endl;
     }
     
 private:
@@ -521,7 +790,7 @@ private:
         
         i->sum_P_ij = 0;
         for (int r = 0; r < i->coveringReadPairs.size(); r++) {
-            if (!i->coveringReadPairs[r]->isRecombined) continue;
+          //  if (!i->coveringReadPairs[r]->isRecombined) continue;
             if (std::isnan(i->coveringReadPairs[r]->sum_r_k)) {
                 i->coveringReadPairs[r]->sum_r_k = 0;
                 for (int k = i->coveringReadPairs[r]->indexLeft; k < i->coveringReadPairs[r]->indexRight; k++) {
@@ -552,46 +821,80 @@ private:
         }
     }
     
-    double updateRecombFractions(const double minCoverage, bool bLoud = true) {
+    double updateRecombFractions(bool bLoud = true) {
         // std::cout << "Updating recombination fractions: " << std::endl;
         double delta = 0;
         int pc = 0; int update5pcInterval = (int)recombIntervals.size() / 20;
         if (bLoud) std::cout << "Updating recombination fractions: ";
+        
+        std::vector<double> updatedRecombFractionsPerBp; updatedRecombFractionsPerBp.resize(recombIntervals.size());
         for (int j = 0; j < recombIntervals.size(); j++) {
-            double newRj;
             if (bLoud) if (j > 0 && j % update5pcInterval == 0) { pc += 5; printPcUpdateOnPrompt(pc); }
             
-            if (recombIntervals[j].effectiveCoverage > minCoverage) {
-                newRj = recombIntervals[j].sum_P_ij / recombIntervals[j].sumConcordantFraction;
-            } else if (recombIntervals[j].effectiveCoverage > 5) {
-                newRj = weighedAverageRateUnderCoveringReads(recombIntervals[j].coveringReadPairs) * recombIntervals[j].dj;
+            if (recombIntervals[j].effectiveCoverage > edgeMinimumCoverage) {
+                updatedRecombFractionsPerBp[j] = (recombIntervals[j].sum_P_ij / recombIntervals[j].sumConcordantFraction)/recombIntervals[j].dj;
+            }
+        }
+        
+        for (int j = 0; j < recombIntervals.size(); j++) {
+            if (recombIntervals[j].effectiveCoverage <= edgeMinimumCoverage) {
+              //  std::cout << "j: " << j << std::endl;
+                updatedRecombFractionsPerBp[j] = weighedAverageRateUnderCoveringReads(recombIntervals[j].coveringReadPairs, j);
                // std::cout << "newRj: " << newRj << std::endl;
                // std::cout << "newRj/ recombIntervals[j].dj: " << newRj/ recombIntervals[j].dj << std::endl;
-            } else {
-                newRj = meanRate * recombIntervals[j].dj;
-            }
-            delta += std::abs(newRj - recombIntervals[j].rj);
-            recombIntervals[j].rj = newRj;
-            recombIntervals[j].recombFractionPerBp = recombIntervals[j].rj / recombIntervals[j].dj;
+            } //else {
+            //    newRj = meanRate * recombIntervals[j].dj;
+            //}
         }
+        
+        for (int j = 0; j < recombIntervals.size(); j++) {
+            recombIntervals[j].recombFractionPerBp = updatedRecombFractionsPerBp[j];
+            double newRj = updatedRecombFractionsPerBp[j] * recombIntervals[j].dj;
+            if (!isnan(newRj) && !isnan(recombIntervals[j].rj)) {
+                delta += std::abs(newRj - recombIntervals[j].rj);
+            }
+            recombIntervals[j].rj = newRj;
+        }
+        
         if (bLoud) std::cout << "delta: " << delta << std::endl;
         return delta;
     }
     
-    double weighedAverageRateUnderCoveringReads(std::vector<DefiningRecombInfo*>& coveringReadPairs) {
+    
+    // Weighed average recombination rate for reads that cover this interval
+    double weighedAverageRateUnderCoveringReads(std::vector<DefiningRecombInfo*>& coveringReadPairs, int rpJ) {
         std::vector<int> coverageCounts; coverageCounts.resize(recombIntervals.size(),0);
+        int leftMostIndex = std::numeric_limits<int>::max(); int rightMostIndex = 0;
         for (int i = 0; i < coveringReadPairs.size(); i++) {
+            if (coveringReadPairs[i]->indexLeft < leftMostIndex) leftMostIndex = coveringReadPairs[i]->indexLeft;
+            if (coveringReadPairs[i]->indexRight > rightMostIndex) rightMostIndex = coveringReadPairs[i]->indexRight;
             for (int j = coveringReadPairs[i]->indexLeft; j < coveringReadPairs[i]->indexRight; j++) {
                 coverageCounts[j]++;
             }
         }
         
+        
         double sumRecomb = 0; double sumLengths = 0;
-        for (int j = 0; j < recombIntervals.size();j++) {
-            sumRecomb += recombIntervals[j].rj * coverageCounts[j];
-            sumLengths += recombIntervals[j].dj * coverageCounts[j];
+        for (int j = leftMostIndex; j <= rightMostIndex;j++) {
+            if(recombIntervals[j].bSufficientCoverage) {
+                sumRecomb += recombIntervals[j].rj * coverageCounts[j];
+                sumLengths += recombIntervals[j].dj * coverageCounts[j];
+            }
         }
+        //if (sumLengths == 0) { return -1;}
         double weighedAvgRate = sumRecomb/sumLengths;
+        
+       /* std::cout << "Interval: " << rpJ << std::endl;
+        std::cout << "weighedAvgRate: " << weighedAvgRate << std::endl;
+       if (weighedAvgRate < 5e-08) {
+            std::cout << "leftMostIndex: " << leftMostIndex << std::endl;
+            std::cout << "rightMostIndex: " << rightMostIndex << std::endl;
+            print_vector(coverageCounts, std::cout, '\n');
+            exit(1);
+        }
+        
+        */
+     
        // std::cout << "vector_sum(coverageCounts): " << vector_sum(coverageCounts) << std::endl;
        // std::cout << "weighedAvgRate: " << weighedAvgRate << std::endl;
         return weighedAvgRate;
@@ -601,8 +904,13 @@ private:
     double calculateCummulativeRates() {
         double cumSum = 0;
         for (int j = 0; j < recombIntervals.size(); j++) {
-            cummulativeRates[j] = cumSum * 100;
-            cumSum += recombIntervals[j].rj;
+            if (isnan(recombIntervals[j].rj)) {
+                if (j > 0) cummulativeRates[j] = cummulativeRates[j-1];
+                else cummulativeRates[j] = 0;
+            } else {
+                cummulativeRates[j] = cumSum * 100;
+                cumSum += recombIntervals[j].rj;
+            }
         }
         return (cumSum * 100);
     }

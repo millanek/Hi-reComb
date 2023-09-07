@@ -24,6 +24,7 @@ using std::map;
 #define PAIR_CONCORDANT 0
 #define PAIR_DISCORDANT 1
 #define PAIR_AMBIGUOUS 2
+#define PAIR_TOO_SHORT 3
 
 double transformFromPhred(const double phredScore);
 
@@ -162,7 +163,7 @@ class RecombRead {
 class DefiningRecombInfo {
     public:
     
-    DefiningRecombInfo(HetInfo* iHet, HetInfo* jHet, int pairRecombinationStatus): indexLeft(-1), indexRight(-1), sum_r_k(NAN) {
+    DefiningRecombInfo(HetInfo* iHet, HetInfo* jHet, int pairRecombinationStatus): indexLeft(-1), indexRight(-1), sum_r_k(NAN), doubleCrossoverProbability(0) {
         posLeft = iHet->pos; posRight = jHet->pos; dist = abs(posRight - posLeft) + 1;
         phaseErrorP_left = transformFromPhred(iHet->thisPhaseQuality); phaseErrorP_right = transformFromPhred(jHet->thisPhaseQuality);
         baseErrorP_left = transformFromPhred(iHet->thisBaseQuality); baseErrorP_right = transformFromPhred(jHet->thisBaseQuality);
@@ -186,16 +187,28 @@ class DefiningRecombInfo {
             probabilityRecombined += (1 - phaseErrorP_left) * phaseErrorP_right * (1 - baseErrorP_left) * (baseErrorP_right / 3);
             // p(ph1=F) * p(ph2=T) * p(b1=T) * p(b2=G)
             probabilityRecombined += phaseErrorP_left * (1 - phaseErrorP_right) * (baseErrorP_left / 3) * (1 - baseErrorP_right);
+            
+            
+            // Calculating the probability of observing recombination if there is no recombination
+            // p(ph1=T) * p(ph2=T) * p(b1=A) * p(b2=C) -- truth is the read pair is A------------------C or A------------------T or A------------------A
+            PrORgivenNR = (1 - phaseErrorP_left) * (1 - phaseErrorP_right) * (1 - baseErrorP_left) * (baseErrorP_right);
+            // p(ph1=T) * p(ph2=T) * p(b1=T) * p(b2=G) -- truth is the read pair is T------------------G or C------------------G or G------------------G
+            PrORgivenNR += (1 - phaseErrorP_left) * (1 - phaseErrorP_right) * (baseErrorP_left) * (1 - baseErrorP_right);
+            // p(ph1=F) * p(ph2=T) * p(b1=A) * p(b2=G) -- truth is the read pair is A------------------G, but the left phase is wrong
+            PrORgivenNR += phaseErrorP_left * (1 - phaseErrorP_right) * (1 - baseErrorP_left) * (1 - baseErrorP_right);
+            // p(ph1=F) * p(ph2=T) * p(b1=A) * p(b2=G) -- truth is the read pair is A------------------G, but the right phase is wrong
+            PrORgivenNR += (1 - phaseErrorP_left) * phaseErrorP_right * (1 - baseErrorP_left) * (1 - baseErrorP_right);
+            
         } else {
             // With a read pair called as:
             //        A------------------C
             // We have the following probabilities:
             // p(ph1=T) * p(ph2=T) * p(b1=A) * p(b2=G)
-            probabilityRecombined += (1 - phaseErrorP_left) * (1 - phaseErrorP_right) * (1 - baseErrorP_left) * (baseErrorP_right / 3);
+            probabilityRecombined = (1 - phaseErrorP_left) * (1 - phaseErrorP_right) * (1 - baseErrorP_left) * (baseErrorP_right / 3);
             // p(ph1=T) * p(ph2=T) * p(b1=T) * p(b2=C)
             probabilityRecombined += (1 - phaseErrorP_left) * (1 - phaseErrorP_right) * (baseErrorP_left / 3) * (1 - baseErrorP_right);
             // p(ph1=F) * p(ph2=T) * p(b1=A) * p(b2=C)
-            probabilityRecombined = phaseErrorP_left * (1 - phaseErrorP_right) * (1 - baseErrorP_left) * (1 - baseErrorP_right);
+            probabilityRecombined += phaseErrorP_left * (1 - phaseErrorP_right) * (1 - baseErrorP_left) * (1 - baseErrorP_right);
             // p(ph1=T) * p(ph2=F) * p(b1=A) * p(b2=C)
             probabilityRecombined += (1 - phaseErrorP_left) * phaseErrorP_right * (1 - baseErrorP_left) * (1 - baseErrorP_right);
             
@@ -209,7 +222,9 @@ class DefiningRecombInfo {
     int dist;
     int isRecombined;
     double probabilityRecombined;
+    double PrORgivenNR;
     double sum_r_k;
+    double doubleCrossoverProbability;
     
     // These are the indices in a sorted vector of all informative hets long the chromosome
     // it cannot be assigned in contruction but is filled in later; -1 is just a placeholder for missing data
