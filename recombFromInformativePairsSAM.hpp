@@ -330,11 +330,12 @@ public:
         for (int i = 0; i != coveredHetPos.size(); i++) {
             if (coveragePerHetDiscord[i] >= 2 && coveragePerHetConcord[i] == 0) problematicSNPs.push_back(coveredHetPos[i]);
         }
-        std::ofstream* depthFile1 = new std::ofstream("recombMap_wDepth_rp" + rn + ".txt");
+       /* std::ofstream* depthFile1 = new std::ofstream("recombMap_wDepth_rp" + rn + ".txt");
         *depthFile1 << "pos" << "\t" << "directReadCoverageConcord" << "\t" << "directReadCoverageDiscord" << std::endl;
         for (int i = 0; i != coveredHetPos.size(); i++) {
             *depthFile1 << coveredHetPos[i] << "\t" << coveragePerHetConcord[i] << "\t" << coveragePerHetDiscord[i] << std::endl;
         }
+        */
         
         std::vector<int> readPairsToRemove;
         for (int i = 0; i != problematicSNPs.size(); i++) {
@@ -483,6 +484,26 @@ public:
             else numConcordant++;
         }
         
+    }
+    
+    
+    void outputInfoForSimulation(const string& fn) {
+        std::ofstream* simInfoFile = new std::ofstream(fn);
+        print_vector(coveredHetPos, *simInfoFile);
+        
+        *simInfoFile << "Discordant read pairs:" << std::endl;
+        for (int j = 0; j < allInformativePairs.size(); j++) {
+            if (allInformativePairs[j]->isRecombined) {
+                *simInfoFile << allInformativePairs[j]->posLeft << "\t" << allInformativePairs[j]->posRight;
+            }
+        }
+        
+        *simInfoFile << "Concordant read pairs:" << std::endl;
+        for (int j = 0; j < allInformativePairs.size(); j++) {
+            if (!allInformativePairs[j]->isRecombined) {
+                *simInfoFile << allInformativePairs[j]->posLeft << "\t" << allInformativePairs[j]->posRight;
+            }
+        }
     }
     
     

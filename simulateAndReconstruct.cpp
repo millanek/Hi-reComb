@@ -1,35 +1,22 @@
 //
-//  recombFromInformativePairsSAM.cpp
+//  simulateAndReconstruct.cpp
 //  Hi-reComb
 //
-//  Created by Milan Malinsky on 02.09.22.
+//  Created by Milan Malinsky on 12.09.23.
 //
 
-
-// Sam flags:
-// 65 -     Paired, first in pair, + strand
-// 81 -     Paired, first in pair, - strand
-// 97 -     Paired, first in pair, + strand
-// 113 -    Paired, first in pair, - strand
-// 129 - Paired, second in pair, + strand
-// 145 - Paired, second in pair, - strand
-// 161 - Paired, second in pair, + strand
-// 177 - Paired, second in pair, - strand
-// >2000 - secondary alignment
-
-
+#include "simulateAndReconstruct.hpp"
 #include "recombFromInformativePairsSAM.hpp"
 
-#define SUBPROGRAM "RecombMap"
+#define SUBPROGRAM "Simulation"
 
 #define DEBUG 1
 
-static const char *DISCORDPAIRS_USAGE_MESSAGE =
-"Usage: " PROGRAM_BIN " " SUBPROGRAM " [OPTIONS] hapcutBlockFile.txt INFORMATVE_PAIRS.sam\n"
-"Generate a recombination map from a phased hapcut2 file of heterozygous sites and a sam file with read pairs covering the hets\n"
+static const char *SIMULATION_USAGE_MESSAGE =
+"Usage: " PROGRAM_BIN " " SUBPROGRAM " [OPTIONS] RecombMap.txt simulationInput.txt\n"
+"Simulates input data corresponding to the parameters and the map and then uses this to attempt to reconstruct the map\n"
 "\n"
 HelpOption RunNameOption
-//"       -m, --min-MQ                            (default: 20) the minimum mapping quality for a read to be considered\n"
 "       -q, --min-BQ                            (default: 30) the minimum base quality for assesssing discordant phase\n"
 "       -d, --min-Dist                          (default: 1000) the minimum distance (bp) to consider discordant phase a recombination\n"
 "                                               as opposed to gene conversion\n"
@@ -92,8 +79,8 @@ namespace opt
     static int minDistanceToDefinePairs = 200;
 }
 
-int RecombFromSAMMain(int argc, char** argv) {
-    parseRecombFromSAMOptions(argc, argv);
+int SimulationMain(int argc, char** argv) {
+    parseSimulationOptions(argc, argv);
     
     std::cout << "1) Processing hets..." << std::endl;
     AllPhaseInfo* p = new AllPhaseInfo(opt::hetsFile, opt::minPQ, opt::hetsSubset);
@@ -196,7 +183,7 @@ int RecombFromSAMMain(int argc, char** argv) {
     return 0;
 }
 
-void parseRecombFromSAMOptions(int argc, char** argv) {
+void parseSimulationOptions(int argc, char** argv) {
     bool die = false;
     for (char c; (c = getopt_long(argc, argv, shortopts, longopts, NULL)) != -1;)
     {
@@ -217,7 +204,7 @@ void parseRecombFromSAMOptions(int argc, char** argv) {
             case 'e': arg >> opt::epsilon; break;
             case OPT_SIM_INPUT: opt::bOutputForSimulations = true; break;
             case 'h':
-                std::cout << DISCORDPAIRS_USAGE_MESSAGE;
+                std::cout << SIMULATION_USAGE_MESSAGE;
                 exit(EXIT_SUCCESS);
         }
     }
@@ -238,7 +225,7 @@ void parseRecombFromSAMOptions(int argc, char** argv) {
     }
     
     if (die) {
-        std::cout << "\n" << DISCORDPAIRS_USAGE_MESSAGE;
+        std::cout << "\n" << SIMULATION_USAGE_MESSAGE;
         exit(EXIT_FAILURE);
     }
     
