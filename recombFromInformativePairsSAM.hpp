@@ -871,7 +871,7 @@ private:
         for (int j = 0; j < recombIntervals.size(); j++) {
             recombIntervals[j].recombFractionPerBp = updatedRecombFractionsPerBp[j];
             double newRj = updatedRecombFractionsPerBp[j] * recombIntervals[j].dj;
-            if (!isnan(newRj) && !isnan(recombIntervals[j].rj)) {
+            if (!std::isnan(newRj) && !std::isnan(recombIntervals[j].rj)) {
                 delta += std::abs(newRj - recombIntervals[j].rj);
             }
             recombIntervals[j].rj = newRj;
@@ -925,7 +925,7 @@ private:
     double calculateCummulativeRates() {
         double cumSum = 0;
         for (int j = 0; j < recombIntervals.size(); j++) {
-            if (isnan(recombIntervals[j].rj)) {
+            if (std::isnan(recombIntervals[j].rj)) {
                 if (j > 0) cummulativeRates[j] = cummulativeRates[j-1];
                 else cummulativeRates[j] = 0;
             } else {
