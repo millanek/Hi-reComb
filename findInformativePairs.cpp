@@ -29,14 +29,13 @@
 
 static const char *INFOREADS_USAGE_MESSAGE =
 "Usage: " PROGRAM_BIN " " SUBPROGRAM " [OPTIONS] HAPCUT2_PHASE.txt\n"
-"Select reads from SAMTOOLS_FILE which could be informative about recombination\n"
+"Select Hi-C read pairs that could be informative about crossovers\n"
 "Expects SAM input on STDIN, e.g.,:\n"
 "samtools view ALIGNEMENT.bam | Hi-reComb FindInfoPairs HAPCUT2_PHASE.txt > INFORMATIVE_READS.sam\n"
 "\n"
 "       -h, --help                              display this help and exit\n"
 "       -n, --run-name                          run-name will be included in the output file name\n"
 "       -m, --min-MQ                            (default: 20) the minimum mapping quality for a read to be considered\n"
-"       --hapCut                                the het positions come from HapCut output"
 "\n"
 "\nReport bugs to " PACKAGE_BUGREPORT "\n\n";
 
@@ -48,14 +47,12 @@ static const struct option longopts[] = {
     { "help",   no_argument, NULL, 'h' },
     { "min-MQ",   required_argument, NULL, 'm' },
     { "run-name",   required_argument, NULL, 'n' },
-    { "hapCut",   no_argument, NULL, OPT_HAPCUT },
     { NULL, 0, NULL, 0 }
 };
 
 namespace opt
 {
     static string hetsFile;
-    static bool hapcutFormat = false;
     static string runName = "";
     static int minMQ = 20;
 }
@@ -124,7 +121,6 @@ void parseInfoReadsOptions(int argc, char** argv) {
         {
             case '?': die = true; break;
             case 'n': arg >> opt::runName; break;
-            case OPT_HAPCUT: opt::hapcutFormat = true; break;
             case 'm': arg >> opt::minMQ; break;
             case 'h':
                 std::cout << INFOREADS_USAGE_MESSAGE;

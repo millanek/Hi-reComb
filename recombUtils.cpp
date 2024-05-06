@@ -21,7 +21,6 @@ void RecombRead::findHetsInMatchingString(const string& matchSeq, const int star
 }
 
 void RecombRead::findHetsInRead(const std::map<int,PhaseInfo*>& positionToPhase) {
-    std::vector<HetInfo*> hetsOnThisRead;
     
     int startPos = readPos; string processedReadSeq = readSeq;
     while (GIGARtypes.size() > 0) {
