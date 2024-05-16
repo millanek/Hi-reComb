@@ -105,6 +105,15 @@ private:
     
 };
 
+class CoveredHetInfo {
+public:
+    CoveredHetInfo(): coverageDiscord(0), coverageConcord(0) {}
+    
+    int coverageDiscord;
+    int coverageConcord;
+};
+
+
 class RecombReadPairs {
 public:
     // Parse the samtools file to find reads that match records from the pairstools file
@@ -145,6 +154,7 @@ public:
     RecombReadPairsStats* stats;
     
     // Records about recombination-informative het sites
+    std::map<int, CoveredHetInfo*> coveredHets;
     std::vector<int> coveredHetPos;
     std::vector<int> coveragePerHetDiscord;
     std::vector<int> coveragePerHetConcord;
@@ -267,6 +277,9 @@ public:
         std::sort(coveredHetPos.begin(), coveredHetPos.end());
         std::vector<int>::iterator it = std::unique(coveredHetPos.begin(), coveredHetPos.end());
         coveredHetPos.resize(distance(coveredHetPos.begin(),it));
+        for (int i = 0; i != coveredHetPos.size(); i++) {
+            coveredHets[coveredHetPos[i]] = new CoveredHetInfo();
+        }
         std::cout << "Number of heterozygous sites covered by all informative read pairs = " << coveredHetPos.size() << std::endl;
     }
     
@@ -324,12 +337,32 @@ public:
         }
     }
     
+    void calculateDirectCoverageOnEachHetMap() {
+        for (int j = 0; j != allInformativePairs.size(); j++) {
+            int posLeft = allInformativePairs[j]->posLeft;
+            int posRight = allInformativePairs[j]->posRight;
+            if (allInformativePairs[j]->isRecombined) {
+                coveredHets.at(posLeft)->coverageDiscord++;
+                coveredHets.at(posRight)->coverageDiscord++;
+            } else {
+                coveredHets.at(posLeft)->coverageConcord++;
+                coveredHets.at(posRight)->coverageConcord++;
+            }
+        }
+    }
+    
     void findAndRemoveReadPairsCoveringMultiHets(const string& rn) {
         
         std::vector<int> problematicSNPs;
-        for (int i = 0; i != coveredHetPos.size(); i++) {
+    /*    for (int i = 0; i != coveredHetPos.size(); i++) {
             if (coveragePerHetDiscord[i] >= 2 && coveragePerHetConcord[i] == 0) problematicSNPs.push_back(coveredHetPos[i]);
+        } */
+        
+        for (int i = 0; i != coveredHetPos.size(); i++) {
+            if (coveredHets.at(coveredHetPos[i])->coverageDiscord >= 2 && coveredHets.at(coveredHetPos[i])->coverageConcord == 0) problematicSNPs.push_back(coveredHetPos[i]);
         }
+        
+        
        /* std::ofstream* depthFile1 = new std::ofstream("recombMap_wDepth_rp" + rn + ".txt");
         *depthFile1 << "pos" << "\t" << "directReadCoverageConcord" << "\t" << "directReadCoverageDiscord" << std::endl;
         for (int i = 0; i != coveredHetPos.size(); i++) {
@@ -591,7 +624,6 @@ public:
         rj = recombFractionPerBp * dj;
         initialiseInterval(rp);
         effectiveCoverage = (int)coveringReadPairs.size();
-        getDirectCoverageOnLeftCoord(rp);
     };
     
     int j;
@@ -624,22 +656,23 @@ public:
                 sumRecombFractionPerBP += (double)rp->allInformativePairs[i]->probabilityRecombined/(double)rp->allInformativePairs[i]->dist;
                 sumConcordantFraction += 1 - rp->allInformativePairs[i]->probabilityRecombined;
             }
+            
+            getDirectCoverageOnLeftCoord(rp->allInformativePairs[i]);
         }
     }
 
 private:
     
-    void getDirectCoverageOnLeftCoord(RecombReadPairs* rp) {
-        for (int j = 0; j != rp->allInformativePairs.size(); j++) {
-            if(rp->allInformativePairs[j]->posLeft == leftCoord || rp->allInformativePairs[j]->posRight == leftCoord){
-                if (rp->allInformativePairs[j]->isRecombined) {
+    void getDirectCoverageOnLeftCoord(DefiningRecombInfo* rInf) {
+        
+            if(rInf->posLeft == leftCoord || rInf->posRight == leftCoord){
+                if (rInf->isRecombined) {
                     directReadCoverageDiscord++;
                 } else {
                     directReadCoverageConcord++;
                 }
             }
         }
-    }
 };
 
 
@@ -658,18 +691,24 @@ public:
             RecombInterval ri(j, meanRate, rp); // Calculate the first iteration
             recombIntervals[j] = ri;
             int update5pcInterval = (int)recombIntervals.size() / 20;
-           // if (j > 0 && j % update5pcInterval == 0) { pc += 5; printPcUpdateOnPrompt(pc); }
+            if (j > 0 && j % update5pcInterval == 0) { pc += 5; printPcUpdateOnPrompt(pc); }
         }
         
         meanEffectiveCoverage = calculateMeanCoverage();
         std::cout << "Mean Effective Coverage = " << meanEffectiveCoverage << std::endl;
-        edgeMinimumCoverage = minCoverageFraction * meanEffectiveCoverage;
+        
+        mapPhysicalLength = recombIntervals.back().rightCoord - recombIntervals.front().leftCoord + 1;
+        edgeMinimumCoverage = (mapPhysicalLength / (double) rp->stats->meanLength) * 5;
+        // edgeMinimumCoverage = minCoverageFraction * meanEffectiveCoverage;
+        std::cout << "edgeMinimumCoverage Coverage v2 = " << edgeMinimumCoverage << std::endl;
+        std::cout << "edgeMinimumCoverage original = " << minCoverageFraction * meanEffectiveCoverage << std::endl;
     }; 
     
     std::vector<RecombInterval> recombIntervals;
     double meanRate;
     std::vector<double> cummulativeRates; // Cummulative rates in cM
     double mapLength; // Map length in cM
+    int mapPhysicalLength; // Map length in bp
     double meanEffectiveCoverage;
     double edgeMinimumCoverage;
     
@@ -937,11 +976,12 @@ private:
     }
     
     double calculateMeanCoverage() {
-        int total = 0;
+        long long int total = 0;
         for (int j = 0; j < recombIntervals.size(); j++) {
             total += recombIntervals[j].effectiveCoverage;
+            assert(total > 0); // check for overflow
         }
-        double meanCoverage = (double)total/recombIntervals.size();
+        double meanCoverage = total/(double)recombIntervals.size();
         return meanCoverage;
     }
     

@@ -84,7 +84,7 @@ namespace opt
     static bool bOutputForSimulations = false;
     static int physicalWindowSize = -1;
     static int nBootstrap = 0;
-    static double epsilon = 0.00001;
+    static double epsilon = 0.01;
 
     // These are fixed for now
     static int maxEMiterations = 10;
@@ -116,8 +116,9 @@ int RecombFromSAMMain(int argc, char** argv) {
     rp->adjustRecombinationProbabilitiesBayes(); rp->adjustRecombinationProbabilities(); rp->stats->collectAndPrintStats("Adjusted for false positive rates: ", rp->allInformativePairs, true);
     rp->findUniqueHetsCoveredByReadsAndSortThem(); // Find and sort informative SNPs
     rp->removeReadPairsAboveAndBelowGivenLength(opt::minDist,0.5);
-    
-    rp->calculateDirectCoverageOnEachHet();
+    std::cout << "Removal done... " << std::endl;
+    rp->calculateDirectCoverageOnEachHetMap();
+    std::cout << "Direct coverage calculated... " << std::endl;
     rp->findAndRemoveReadPairsCoveringMultiHets(opt::runName);
     
     rp->findWhichHetsAreUsedByFinalReadPairSet(); // For each informative read-pair, find the indices of the bounding SNPs in the sorted het vector
@@ -132,8 +133,12 @@ int RecombFromSAMMain(int argc, char** argv) {
         rp->printReadPairFileInfoIntoFile("concordantPairs" + opt::runName + ".txt", false);
     }
     std::cout << std::endl;
+        
+  //  double lambda = rp->numDiscordant*2 / (double)p->posToPhase.size();
+  //  std::cout << "Probability of two discordant pairs landing on the same SNP Poisson = " << (pow(lambda, 2.0) * exp(-lambda)) / 2.0  << std::endl;
+
+         
     
-    std::cout << "Probability of two discordant pairs landing on the same SNP = " << binomialPMF(2, rp->numDiscordant*2, 1.0/p->posToPhase.size())  << std::endl;
         
     std::cout << "5) Making a genetic map... " << std::endl;
     
@@ -144,7 +149,8 @@ int RecombFromSAMMain(int argc, char** argv) {
     rm->outputMapToFile("recombMap_initial" + opt::runName + ".txt");
     
     std::cout << "Starting EM iterations..." << std::endl; int EMi = 0;
-    while (rm->delta > (opt::epsilon * rp->stats->numDiscordant) && rm->EMiterationNum < opt::maxEMiterations) {
+  //  while (rm->delta > (opt::epsilon * rp->stats->numDiscordant) && rm->EMiterationNum < opt::maxEMiterations) {
+    while (rm->delta > opt::epsilon && rm->EMiterationNum < opt::maxEMiterations) {
         EMi++;
         rm->EMiteration();
         std::cout << "Map length = " << rm->mapLength << std::endl;
