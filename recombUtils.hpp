@@ -121,6 +121,8 @@ class ReadLinkSNPpair {
 
 class RecombRead {
     public:
+    RecombRead() {};
+    
     RecombRead(const std::vector<string> samRecVec) : usedLength(0) {
         
         flag = atoi(samRecVec[1].c_str());
@@ -189,6 +191,9 @@ class DefiningRecombInfo {
             probabilityRecombined += phaseErrorP_left * (1 - phaseErrorP_right) * (baseErrorP_left / 3) * (1 - baseErrorP_right);
             
             
+            PrORgivenNR = 1 - probabilityRecombined;
+            
+            /*
             // Calculating the probability of observing recombination if there is no recombination
             // p(ph1=T) * p(ph2=T) * p(b1=A) * p(b2=C) -- truth is the read pair is A------------------C or A------------------T or A------------------A
             PrORgivenNR = (1 - phaseErrorP_left) * (1 - phaseErrorP_right) * (1 - baseErrorP_left) * (baseErrorP_right);
@@ -198,8 +203,14 @@ class DefiningRecombInfo {
             PrORgivenNR += phaseErrorP_left * (1 - phaseErrorP_right) * (1 - baseErrorP_left) * (1 - baseErrorP_right);
             // p(ph1=F) * p(ph2=T) * p(b1=A) * p(b2=G) -- truth is the read pair is A------------------G, but the right phase is wrong
             PrORgivenNR += (1 - phaseErrorP_left) * phaseErrorP_right * (1 - baseErrorP_left) * (1 - baseErrorP_right);
+            */
+            if(probabilityRecombined + PrORgivenNR != 1) {
+                std::cout << "probabilityRecombined = " << probabilityRecombined << "; PrORgivenNR = " << PrORgivenNR << std::endl;
+                std::cout << "probabilityRecombined + PrORgivenNR = " << probabilityRecombined + PrORgivenNR << std::endl;
+            }
             
         } else {
+            /*
             // With a read pair called as:
             //        A------------------C
             // We have the following probabilities:
@@ -213,6 +224,7 @@ class DefiningRecombInfo {
             probabilityRecombined += (1 - phaseErrorP_left) * phaseErrorP_right * (1 - baseErrorP_left) * (1 - baseErrorP_right);
             
             //probabilityRecombined = 0;
+             */
         }
     }
     

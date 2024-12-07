@@ -16,8 +16,6 @@ static const char *TRIO_USAGE_MESSAGE =
 "Calculate the Allele Frequencies per population/species from a VCF \n"
 "\n"
 HelpOption RunNameOption
-"       -g, --use-genotype-probabilities        (optional) use genotype probabilities (GP tag) if present\n"
-"                                               if GP not present calculate genotype probabilities from likelihoods (GL or PL tags) using a Hardy-Weinberg prior\n"
 "\n"
 "\nReport bugs to " PACKAGE_BUGREPORT "\n\n";
 
@@ -27,7 +25,6 @@ static const char* shortopts = "hn:";
 static const struct option longopts[] = {
     { "help",   no_argument, NULL, 'h' },
     { "run-name",   required_argument, NULL, 'n' },
-    { "use-genotype-probabilities", no_argument, NULL, 'g'},
     { NULL, 0, NULL, 0 }
 };
 
@@ -133,28 +130,36 @@ int trioPhaseMain(int argc, char** argv) {
                 
                 char P1firstAllele = getAllele(genotypes[iP1], 0, v);
                 char P1secondAllele = getAllele(genotypes[iP1], 2, v);
+                
+                // Offspring: GC P1: AA
+                // If neither offspring genotype matches Parent 1, we classify this SNP as a Mendelian violation and cannot phase:
                 if (offspringAllele1 != P1firstAllele && offspringAllele1 != P1secondAllele && offspringAllele2 != P1firstAllele && offspringAllele2 != P1secondAllele) { numViolations++; continue; }
                 
                 char P2firstAllele = getAllele(genotypes[iP2], 0, v);
                 char P2secondAllele = getAllele(genotypes[iP2], 2, v);
+                
+                // If neither offspring genotype matches Parent 1, we classify this SNP as a Mendelian violation and cannot phase:
                 if (offspringAllele1 != P2firstAllele && offspringAllele1 != P2secondAllele && offspringAllele2 != P2firstAllele && offspringAllele2 != P2secondAllele) { numViolations++; continue; }
                 
+                // If offspringAllele1 is not present in either parent, we classify this SNP as a Mendelian violation and cannot phase:
                 if (offspringAllele1 != P1firstAllele && offspringAllele1 != P1secondAllele && offspringAllele1 != P2firstAllele && offspringAllele1 != P2secondAllele) { numViolations++; continue; }
                 
+                // If offspringAllele2 is not present in either parent, we classify this SNP as a Mendelian violation and cannot phase:
                 if (offspringAllele2 != P1firstAllele && offspringAllele2 != P1secondAllele && offspringAllele2 != P2firstAllele && offspringAllele2 != P2secondAllele) { numViolations++; continue; }
                 
-                // Offspring: A/T
-                // Parents P1:AT P2:AT    -->   Impossible to phase
+                // If both parents are heterozygous, we cannot phase
+                // Offspring: 0/1
+                // Parents P1: 0/1 P2: 0/1    -->   Impossible to phase
                 if (P1firstAllele != P1secondAllele && P2firstAllele != P2secondAllele) { numParentsUninformative++; continue; }
                 
-                // Offspring: A/T
-                // Parents P1:AA P2:TT
-                // Parents P1:TT P2:AA
+                // Offspring: 0/1
+                // Parents P1: 0/0 P2: 1/1
+                // Parents P1: 1/1 P2: 0/0
                 if (P1firstAllele == P1secondAllele && P2firstAllele == P2secondAllele) {
-                    if (offspringAllele1 == P1firstAllele) { // Parents P1:AA P2:TT
+                    if (offspringAllele1 == P1firstAllele) { // Parents P1: 0/0 P2: 1/1
                         numPhasedHets++; printPhasedLine(*outFilePhasedHets, numPhasedHets, v, offspringAllele1, offspringAllele2); continue;
                     }
-                    if (offspringAllele1 == P2firstAllele) { // Parents P1:TT P2:AA
+                    if (offspringAllele1 == P2firstAllele) { // Parents P1: 1/1 P2: 0/0
                         numPhasedHets++; printPhasedLine(*outFilePhasedHets, numPhasedHets, v, offspringAllele2, offspringAllele1);
                         continue;
                     }
@@ -167,7 +172,7 @@ int trioPhaseMain(int argc, char** argv) {
                     if (offspringAllele2 == P2firstAllele) { // Parents P1:AT P2:TT
                         numPhasedHets++; printPhasedLine(*outFilePhasedHets, numPhasedHets, v, offspringAllele1, offspringAllele2); continue;
                     }
-                    if (offspringAllele1 == P2firstAllele) { // Parents P1:AT P2:TT
+                    if (offspringAllele1 == P2firstAllele) { // Parents P1:TT P2:AT
                         numPhasedHets++; printPhasedLine(*outFilePhasedHets, numPhasedHets, v, offspringAllele2, offspringAllele1); continue;
                     }
                 }

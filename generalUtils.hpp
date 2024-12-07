@@ -123,6 +123,94 @@ inline char getAllele(const string& gt, const int alleleNum, const VariantInfo& 
     return allele;
 }
 
+
+// -------------------------------------   BASIC RECOMBINATION MAP DEFINITION CLASSES  ----------------------------------------
+// These are extended in specific use-cases 
+
+class RecombIntervalBase {
+public:
+    RecombIntervalBase() {};
+    
+    RecombIntervalBase(int leftIndex, int leftCoordIn, int rightCoordIn, double perBpRateIn) {
+        j = leftIndex;
+        recombFractionPerBp = perBpRateIn;
+        leftCoord = leftCoordIn; rightCoord = rightCoordIn;
+        dj = rightCoord - leftCoord + 1;
+        rj = recombFractionPerBp * dj;
+    };
+    
+    int j;
+    int leftCoord;
+    int rightCoord;
+    double recombFractionPerBp;
+    int dj; double rj;
+};
+
+
+class RecombMapBase {
+public:
+    
+    RecombMapBase() {
+        physicalWindowStartEnd.resize(2);
+    };
+    
+    double meanRate;
+    std::vector<double> cummulativeRates; // Cummulative rates in cM
+    double mapLength; // Map length in cM
+    long long int mapPhysicalLength; // Map length in bp
+    int mapPhysicalStart; // Map start in bp position on chromosome
+    int mapPhysicalEnd; // Map end in bp position on chromosome
+    double meanEffectiveCoverage;
+    std::vector<double> physicalWindowR;
+    std::vector<std::vector<int>> physicalWindowStartEnd;
+    
+    double getAverageRateForPhysicalWindow(const int start, const int end) {
+        
+        if (intervalCoordsVectors.empty()) {
+            std::cerr << "ERROR: problem calculating average rate for a particular genomic window starting at: " << start << "bp" << std::endl;
+            std::cerr << "This is most likely a bug. Please report. " << std::endl;
+            exit(EXIT_FAILURE);
+        }
+        
+        // Binary search to find the first interval whose end coordinate is greater
+        // or equal to the start of the region in question
+        std::vector<int>::iterator itStart = lower_bound(intervalCoordsVectors[1].begin(),intervalCoordsVectors[1].end(),start);
+        int numBPtotal = 0; int numBPthisInterval = 0;
+        double sumPerBPvalue = 0; double meanValue = NAN;
+        
+        if (itStart != intervalCoordsVectors[1].end()) {  // if (start < f[1])    ---  excludind case 1)
+            std::vector<int>::size_type index = std::distance(intervalCoordsVectors[1].begin(), itStart);
+            // Sum the lengths
+            while (intervalCoordsVectors[0][index] <= end && index < intervalCoordsVectors[0].size()) { // if (f[0] >= end)   ---    excluding case 2)
+                double valueThisInterval = intervalPerBPrVector[index];
+
+              //  std::cerr << "valuesThisFeature[0]\t" << valuesThisFeature[0] << std::endl;
+                if (intervalCoordsVectors[0][index] < start && intervalCoordsVectors[1][index] <= end)
+                    numBPthisInterval = (intervalCoordsVectors[1][index] - start) + 1;
+                else if (intervalCoordsVectors[0][index] >= start && intervalCoordsVectors[1][index] <= end)
+                    numBPthisInterval = (intervalCoordsVectors[1][index] - intervalCoordsVectors[0][index]);
+                else if (intervalCoordsVectors[0][index] >= start && intervalCoordsVectors[1][index] > end)
+                    numBPthisInterval = (end - intervalCoordsVectors[0][index]);
+                else if (intervalCoordsVectors[0][index] < start && intervalCoordsVectors[1][index] > end)
+                    numBPthisInterval = (end - start) + 1;
+                
+                numBPtotal += numBPthisInterval;
+                sumPerBPvalue += valueThisInterval * numBPthisInterval;
+                index++;
+            }
+            
+                meanValue = (double)sumPerBPvalue/numBPtotal;
+            //std::cerr << "meanValue: " << meanValue << std::endl;
+        }
+        return meanValue;
+    }
+    
+protected:
+    std::vector< std::vector<int> > intervalCoordsVectors; std::vector<double> intervalPerBPrVector;
+};
+
+
+
 // -------------------------------------    BASIC MATH/STATS  ----------------------------------------
 
 // factorial(x): (x! for non-negative integer x) is defined to be gamma(x+1) (as in R)

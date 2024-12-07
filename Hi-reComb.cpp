@@ -17,6 +17,7 @@
 #include "findInformativePairs.hpp"
 #include "countMendelianViolations.hpp"
 #include "TrioPhase.hpp"
+#include "simulateAndReconstruct.hpp"
 
 
 #define AUTHOR "Milan Malinsky"
@@ -37,8 +38,9 @@ static const char *USAGE_MESSAGE =
 "           FindInfoPairs       Find read pairs that would be informative for estimating the recombination\n"
 "           RecombMap           Estimate the recombination map from informative Hi-C read pairs\n"
 "Extra tools:\n"
-"           CountViolations     \n"
-"           TrioPhase     \n"
+"           Simulate            Simulate informative read-pairs for a given map to evaluate confidence in reconstruction\n"
+"           TrioPhase           Generate a phased het file for use with Hi-Recomb from a VCF with trio(s) (mother-father-offspring)\n"
+"           CountViolations     (specific use case) Find trios in a VCF\n"
 "\nReport bugs to " PACKAGE_BUGREPORT "\n\n";
 
 int main(int argc, char **argv) {
@@ -66,6 +68,8 @@ int main(int argc, char **argv) {
             RecombFromSAMMain(argc - 1, argv + 1);
         else if(command == "FindInfoPairs")
             InfoReadsMain(argc - 1, argv + 1);
+        else if (command == "Simulate")
+            SimulationMain(argc - 1, argv + 1);
         else if (command == "CountViolations")
             vioMain(argc - 1, argv + 1);
         else if (command == "TrioPhase")
