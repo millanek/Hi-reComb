@@ -172,11 +172,11 @@ int SimulationMain(int argc, char** argv) {
         }
         std::cout << "DONE.... Map length = " << rm->mapLength << std::endl;
         std::cout << std::endl;
-        rm->outputMapToFile("recombMap" + opt::runName + ".txt");
+       // rm->outputMapToFile("recombMap" + opt::runName + ".txt");
         rm->calculateMapForFixedWindowSizes(opt::physicalWindowSize);
    //   rm->outputMapToFileFixedWindowSizes("recombMap" + opt::runName + "_FW_" + numToString(opt::physicalWindowSize) + ".txt", opt::physicalWindowSize);
         simulationResults2kb[r] = rm->physicalWindowR;
-        simulationResults2kb[r].resize(simulationResults2kb[0].size()); // Sometimes the reconstructed map can be a bit shorter if there were no read pairs at the end
+        simulationResults2kb[r].resize(simulationResults2kb[0].size(),NAN); // Sometimes the reconstructed map can be a bit shorter if there were no read pairs at the end
     }
     
     string fileName = "simulatedMaps_" + opt::runName + "_FW_" + numToString(opt::physicalWindowSize) + ".txt";
