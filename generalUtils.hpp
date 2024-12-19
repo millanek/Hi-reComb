@@ -163,6 +163,7 @@ public:
     double meanEffectiveCoverage;
     std::vector<double> physicalWindowR;
     std::vector<std::vector<int>> physicalWindowStartEnd;
+    std::vector<std::vector<double>> physicalWindowBootstraps;
     
     double getAverageRateForPhysicalWindow(const int start, const int end) {
         

@@ -37,10 +37,10 @@ static const char *USAGE_MESSAGE =
 "Commands:\n"
 "           FindInfoPairs       Find read pairs that would be informative for estimating the recombination\n"
 "           RecombMap           Estimate the recombination map from informative Hi-C read pairs\n"
-"Extra tools:\n"
+"Utilities:\n"
 "           Simulate            Simulate informative read-pairs for a given map to evaluate confidence in reconstruction\n"
 "           TrioPhase           Generate a phased het file for use with Hi-Recomb from a VCF with trio(s) (mother-father-offspring)\n"
-"           CountViolations     (specific use case) Find trios in a VCF\n"
+// "           CountViolations     (specific use case) Find trios in a VCF\n"
 "\nReport bugs to " PACKAGE_BUGREPORT "\n\n";
 
 int main(int argc, char **argv) {

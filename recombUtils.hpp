@@ -203,12 +203,11 @@ class DefiningRecombInfo {
             PrORgivenNR += phaseErrorP_left * (1 - phaseErrorP_right) * (1 - baseErrorP_left) * (1 - baseErrorP_right);
             // p(ph1=F) * p(ph2=T) * p(b1=A) * p(b2=G) -- truth is the read pair is A------------------G, but the right phase is wrong
             PrORgivenNR += (1 - phaseErrorP_left) * phaseErrorP_right * (1 - baseErrorP_left) * (1 - baseErrorP_right);
-            */
             if(probabilityRecombined + PrORgivenNR != 1) {
                 std::cout << "probabilityRecombined = " << probabilityRecombined << "; PrORgivenNR = " << PrORgivenNR << std::endl;
                 std::cout << "probabilityRecombined + PrORgivenNR = " << probabilityRecombined + PrORgivenNR << std::endl;
             }
-            
+             */
         } else {
             /*
             // With a read pair called as:

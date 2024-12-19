@@ -25,7 +25,7 @@
 #define DEBUG 1
 
 static const char *DISCORDPAIRS_USAGE_MESSAGE =
-"Usage: " PROGRAM_BIN " " SUBPROGRAM " [OPTIONS] hapcutBlockFile.txt INFORMATVE_PAIRS.sam\n"
+"Usage: " PROGRAM_BIN " " SUBPROGRAM " [OPTIONS] HAPCUT2_PHASE.txt INFORMATVE_PAIRS.sam\n"
 "Generate a recombination map from a phased hapcut2 file of heterozygous sites and a sam file with read pairs covering the hets\n"
 "\n"
 HelpOption RunNameOption
@@ -35,6 +35,7 @@ HelpOption RunNameOption
 "       -e, --epsilon=NUM                       (default: 0.0001) sets when the EM algorithm is deemed to have converged\n"
 "                                               the smaller the epsilon the more EM iterations will be run\n"
 "       -m, --maxEM=NUM                         (default: 10) maximum number of EM iterations to run\n"
+"       -x, --minCoverageF=NUM                   (default: 0.2) Minimum coverage fraction around chromosome edges\n"
 "       -s, --subsetHets=FILE.txt               (optional) Exclude the sites specified in this file\n"
 "       -v, --verbose                           Verbose info to std_out\n"
 "\n"
@@ -48,7 +49,7 @@ HelpOption RunNameOption
 "\n"
 "\nReport bugs to " PACKAGE_BUGREPORT "\n\n";
 
-static const char* shortopts = "hn:q:m:p:d:s:f:crb:e:iv";
+static const char* shortopts = "hn:q:m:p:d:s:f:crb:e:ivx:";
 
 static const struct option longopts[] = {
     { "help",   no_argument, NULL, 'h' },
@@ -64,6 +65,7 @@ static const struct option longopts[] = {
     { "bootstrap",   required_argument, NULL, 'b' },
     { "epsilon",   required_argument, NULL, 'e' },
     { "intermediateMaps",   no_argument, NULL, 'i' },
+    { "minCoverageF",   required_argument, NULL, 'x' },
     { "verbose",   no_argument, NULL, 'v' },
     { NULL, 0, NULL, 0 }
 };
@@ -169,38 +171,35 @@ int RecombFromSAMMain(int argc, char** argv) {
     
     // Optional: calculate and print coverage stats (effective coverage and direct coverage) per het site
     if(opt::outputCoverageStats) rm->printPerHetCoverageStats("recombMap_wDepth" + opt::runName + ".txt");
-         
+    
+    
     if (opt::nBootstrap > 0) {
         std::cout << std::endl;
         std::cout << "5a) Bootstrap... " << std::endl;
      //   std::cout << "Sample: 1" << std::endl;
        
-    // Add the original ma as the first sample
-       for (int j = 0; j < rm->recombIntervals.size(); j++) {
-            rm->recombIntervals[j].bootstrapRecombFractions.push_back(rm->recombIntervals[j].recombFractionPerBp);
-       }
+    // Add the original map as the first sample
+        rm->physicalWindowBootstraps.push_back(rm->physicalWindowR);
         
         std::vector<DefiningRecombInfo*> orginalInformativePairs = rp->allInformativePairs;
         for (int i = 0; i < opt::nBootstrap; i++) {
-
-            rp->allInformativePairs = rp->getBootstrapSample(orginalInformativePairs);
-            for (int j = 0; j < rm->recombIntervals.size(); j++) {
-                rm->recombIntervals[j].initialiseInterval(rp);
-                // rm->recombIntervals[j].updateVals(opt::minCoverage * rm->meanEffectiveCoverage);
-            }
-            rm->firstUpdate();
-            rm->delta = std::numeric_limits<double>::max(); rm->EMiterationNum = 0;
-            while (rm->delta > (opt::epsilon * rp->stats->numDiscordant) && rm->EMiterationNum < opt::maxEMiterations) {
-                rm->EMiteration(false);
+            RecombReadPairs* thisRp = new RecombReadPairs(*rp);
+            thisRp->allInformativePairs = thisRp->getBootstrapSample(orginalInformativePairs);
+            RecombMap* thisRm = new RecombMap(thisRp, opt::minCoverage, true);
+            thisRm->firstUpdate();
+    
+            while (thisRm->delta > (opt::epsilon) && thisRm->EMiterationNum < opt::maxEMiterations) {
+                thisRm->EMiteration(opt::v);
                 //std::cout << "Map length = " << rm->mapLength << std::endl;
             }
-            std::cout << "DONE.... Map length = " << rm->mapLength << std::endl;
-            for (int j = 0; j < rm->recombIntervals.size(); j++) {
-                rm->recombIntervals[j].bootstrapRecombFractions.push_back(rm->recombIntervals[j].recombFractionPerBp);
-            }
+            std::cout << "DONE.... Map length = " << thisRm->mapLength << std::endl;
+            thisRm->calculateMapForFixedWindowSizes(opt::physicalWindowSize);
+            thisRm->physicalWindowR.resize(rm->physicalWindowR.size(),NAN);
+            rm->physicalWindowBootstraps.push_back(thisRm->physicalWindowR);
             std::cout << "Sample: " << i + 1 << std::endl;
+            delete thisRm; delete thisRp;
         }
-        rm->outputBootstrapToFile("bootstrap" + opt::runName + ".txt");
+        rm->outputBootstrapToFilePhysical("bootstrap" + opt::runName + ".txt");
     }
      
     return 0;
@@ -227,6 +226,7 @@ void parseRecombFromSAMOptions(int argc, char** argv) {
             case 'v': opt::v = true; break;
             case 'b': arg >> opt::nBootstrap; break;
             case 'e': arg >> opt::epsilon; break;
+            case 'x': arg >> opt::minCoverage; break;
             case 'h':
                 std::cout << DISCORDPAIRS_USAGE_MESSAGE;
                 exit(EXIT_SUCCESS);

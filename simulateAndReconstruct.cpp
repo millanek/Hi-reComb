@@ -12,8 +12,8 @@
 #define DEBUG 1
 
 static const char *SIMULATION_USAGE_MESSAGE =
-"Usage: " PROGRAM_BIN " " SUBPROGRAM " [OPTIONS] RecombMap.txt simulationInput.txt\n"
-"Simulates input data corresponding to the parameters and the map and then uses this to attempt to reconstruct the map\n"
+"Usage: " PROGRAM_BIN " " SUBPROGRAM " [OPTIONS] ReferenceMap.txt INFORMATVE_PAIRS.sam\n"
+"Simulates Hi-C read pairs corresponding to the parameters and the reference map, with insert size distribution sampled from 'INFORMATVE_PAIRS.sam'. Then uses the simulated data to reconstruct the map using the same algorithm as in the 'RecombMap' command.\n"
 "\n"
 HelpOption RunNameOption
 "       -v, --verbose                           Verbose info to std_out\n"
