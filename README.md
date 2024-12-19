@@ -28,9 +28,10 @@ Hi-reComb TrioPhase [OPTIONS] OFFSPRING.vcf(.gz) PARENTS.vcf(.gz) PARENT1,PARENT
 
 All files should be divided by chromosome/scaffold.
 
-1. An alignment file with Hi-C read pairs from gametes (sperm, pollen ...) from a single individual in the [SAM / BAM](https://samtools.github.io/hts-specs/SAMv1.pdf) format. For suggestions on producing as the 'ALIGNEMENT.bam' file see [here](Data_preprocessing.md).   
+1. An alignment file with Hi-C read pairs from gametes (sperm, pollen ...) from a single individual in the [SAM / BAM](https://samtools.github.io/hts-specs/SAMv1.pdf) format.   
 2. Phased SNPs at sites that are heterozygous in the donor (the individual from whom the gametes were obtained from). The phasing can be obtained directly from the Hi-C data using the [hapcut2 software](https://github.com/vibansal/HapCUT2) (make sure you use the `--hic 1` option). Alternatively, if you have variant calls for the parents of the donor individual, you can use the `Hi-reComb TrioPhase` utility. In any case, the 'HAPCUT2_PHASE.txt' file should be in the [hapcut2 format](HapCUT2_format.md).
 
+For suggestions/examples on producing the input files see [here](Data_preprocessing.md). 
    
 ## Installation
 To compile you must have a reasonably recent GCC (>=4.9.0) or clang compiler (on mac OS this comes with 'Command Line Tools').
