@@ -1,6 +1,6 @@
-#  Data preprocessing
+#  Obtaining input data
 
-After obtaining the gamete Hi-C library, you can process the data for example as follows:
+First you need to make a Hi-C sequencing library from gametes of a single individual (donor). We have been using the Dovetail Omni-C kit, because it's endonuclease-based chromating digestion delivers a more uniform coverage across the genome when compared with restriction-enzyme-based kits. For starting material, we aimed for between 100,000 and 1 million fresh or flash frozen gametes, then we followed the standard protocol, and then aimed fot about 100x coverage paired-end Illumina sequencing. After obtaining the gamete Hi-C library, you can process the data for example as follows:
 
 ## 1. Alignment and duplicate detection
 
