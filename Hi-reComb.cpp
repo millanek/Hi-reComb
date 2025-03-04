@@ -9,8 +9,6 @@
 
 // Some questions:
 // 1) Are insert length distributions along the genome random in the joint recomb + non-recomb pairs?
-// 2) Does the average genome-wide recombination rate inferred depend on the insert sizes that are used? E.g., try inferring with only 0-1000bp, 1000-2000bp, 2000-10000bp, and longer? Specifically, at less than 1000bp, maybe there will be an effect of gene-conversion?
-// 3) Find the coverage of informative read-pairs at every covered het SNP.
 
 #include "generalUtils.hpp"
 #include "recombFromInformativePairsSAM.hpp"

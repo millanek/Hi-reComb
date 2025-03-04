@@ -1,6 +1,6 @@
 # Hi-reComb
 
-## Estimating recombination maps from sperm Hi-C data
+## Estimating recombination maps from gamete Hi-C data
 
 Author: Milan Malinsky 
 Email: millanek@gmail.com

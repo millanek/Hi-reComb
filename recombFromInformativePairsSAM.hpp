@@ -366,14 +366,6 @@ public:
             if (coveredHets.at(coveredHetPos[i])->coverageDiscord >= 2 && coveredHets.at(coveredHetPos[i])->coverageConcord == 0) problematicSNPs.push_back(coveredHetPos[i]);
         }
         
-        
-       /* std::ofstream* depthFile1 = new std::ofstream("recombMap_wDepth_rp" + rn + ".txt");
-        *depthFile1 << "pos" << "\t" << "directReadCoverageConcord" << "\t" << "directReadCoverageDiscord" << std::endl;
-        for (int i = 0; i != coveredHetPos.size(); i++) {
-            *depthFile1 << coveredHetPos[i] << "\t" << coveragePerHetConcord[i] << "\t" << coveragePerHetDiscord[i] << std::endl;
-        }
-        */
-        
         std::vector<int> readPairsToRemove;
         for (int i = 0; i != problematicSNPs.size(); i++) {
             for (int j = 0; j != allInformativePairs.size(); j++) {
