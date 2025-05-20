@@ -8,35 +8,35 @@
 #include "generalUtils.hpp"
 
 
-void split(const std::string &s, char delim, std::vector<std::string> &elems) {
+void split(const string &s, char delim, vector<string> &elems) {
     std::stringstream ss(s);
-    std::string item;
+    string item;
     while (std::getline(ss, item, delim)) {
         elems.push_back(item);
     }
 }
 
-void splitToDouble(const std::string &s, char delim, std::vector<double> &elems) {
+void splitToDouble(const string &s, char delim, vector<double> &elems) {
     std::stringstream ss(s);
-    std::string item;
+    string item;
     while (std::getline(ss, item, delim)) {
         elems.push_back(stringToDouble(item));
     }
 }
 
-std::vector<double> splitToDouble(const std::string &s, char delim) {
-    std::vector<double> elems;
+vector<double> splitToDouble(const string &s, char delim) {
+    vector<double> elems;
     splitToDouble(s, delim, elems);
     return elems;
 }
 
-std::vector<std::string> split(const std::string &s, char delim) {
-    std::vector<std::string> elems;
+vector<string> split(const string &s, char delim) {
+    vector<string> elems;
     split(s, delim, elems);
     return elems;
 }
 
-double stringToDouble(std::string s) {
+double stringToDouble(string s) {
     double d;
     std::stringstream ss(s); //turn the string into a stream
     ss >> d; //convert
@@ -44,7 +44,7 @@ double stringToDouble(std::string s) {
 }
 
 // Ensure a filehandle is open
-void assertFileOpen(std::ifstream& fh, const std::string& fn)
+void assertFileOpen(std::ifstream& fh, const string& fn)
 {
     if(!fh.is_open())
     {
@@ -54,7 +54,7 @@ void assertFileOpen(std::ifstream& fh, const std::string& fn)
 }
 
 // Ensure a filehandle is open
-void assertFileOpen(std::ofstream& fh, const std::string& fn)
+void assertFileOpen(std::ofstream& fh, const string& fn)
 {
     if(!fh.is_open())
     {
@@ -63,7 +63,7 @@ void assertFileOpen(std::ofstream& fh, const std::string& fn)
     }
 }
 //
-void assertGZOpen(gzstreambase& gh, const std::string& fn)
+void assertGZOpen(gzstreambase& gh, const string& fn)
 {
     if(!gh.good())
     {
@@ -72,14 +72,14 @@ void assertGZOpen(gzstreambase& gh, const std::string& fn)
     }
 }
 
-std::string suffix(const std::string& seq, size_t len)
+string suffix(const string& seq, size_t len)
 {
     assert(seq.length() >= len);
     return seq.substr(seq.length() - len);
 }
 
 // Returns true if the filename has an extension indicating it is compressed
-bool isGzip(const std::string& filename)
+bool isGzip(const string& filename)
 {
     size_t suffix_length = sizeof(GZIP_EXT) - 1;
     
@@ -87,13 +87,13 @@ bool isGzip(const std::string& filename)
     if(filename.length() < suffix_length)
         return false;
     
-    std::string extension = suffix(filename, suffix_length);
+    string extension = suffix(filename, suffix_length);
     return extension == GZIP_EXT;
 }
 
 // Open a file that may or may not be gzipped for reading
 // The caller is responsible for freeing the handle
-std::istream* createReader(const std::string& filename, std::ios_base::openmode mode)
+std::istream* createReader(const string& filename, std::ios_base::openmode mode)
 {
     if(isGzip(filename))
     {
@@ -111,7 +111,7 @@ std::istream* createReader(const std::string& filename, std::ios_base::openmode 
 
 // Open a file that may or may not be gzipped for writing
 // The caller is responsible for freeing the handle
-std::ostream* createWriter(const std::string& filename,
+std::ostream* createWriter(const string& filename,
                            std::ios_base::openmode mode)
 {
     if(isGzip(filename))

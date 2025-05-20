@@ -39,14 +39,14 @@ namespace opt
 
 int trioPhaseMain(int argc, char** argv) {
     parseTrioPhaseOptions(argc, argv);
-    std::vector<string> parentNames = split(opt::parentNames, ',');
+    vector<string> parentNames = split(opt::parentNames, ',');
     if (parentNames.size() != 2) {
         std::cerr << "ERROR: The parents need to be exactly two individual IDs separated by a comma. Exiting..." << std::endl; exit(1);
     }
         
-    std::vector<std::string> fields;
+    vector<string> fields;
     string chr; string coord;
-    std::map<int,string> offspringPosToGT;
+    map<int,string> offspringPosToGT;
     // std::ostream* outFileAF = createWriter(stripExtension(opt::setsFile) + "_" + opt::runName + "_AF" + ".txt");
     
     string line; // for reading the input files
@@ -61,7 +61,7 @@ int trioPhaseMain(int argc, char** argv) {
             continue;
         else if (line[0] == '#' && line[1] == 'C') {
             fields = split(line, '\t');
-            std::vector<std::string> sampleNames(fields.begin()+NUM_VCF_NON_GENOTYPE_COLUMNS,fields.end());
+            vector<string> sampleNames(fields.begin()+NUM_VCF_NON_GENOTYPE_COLUMNS,fields.end());
             if (sampleNames.size() > 1) {
                 std::cerr << "ERROR: The offspring VCF file should only contain one sample." << std::endl; exit(1);
             }
@@ -72,7 +72,7 @@ int trioPhaseMain(int argc, char** argv) {
             if (v.altAlleles.size() > 1) continue;
             if (v.altAlleles[0].length() > 1) continue;
             
-            std::vector<std::string> genotypes(fields.begin()+NUM_VCF_NON_GENOTYPE_COLUMNS,fields.end());
+            vector<string> genotypes(fields.begin()+NUM_VCF_NON_GENOTYPE_COLUMNS,fields.end());
             
             
             string firstAllele; firstAllele += getAllele(genotypes[0], 0, v);
@@ -99,10 +99,10 @@ int trioPhaseMain(int argc, char** argv) {
             continue;
         else if (line[0] == '#' && line[1] == 'C') {
             fields = split(line, '\t');
-            std::vector<std::string> sampleNames(fields.begin()+NUM_VCF_NON_GENOTYPE_COLUMNS,fields.end());
+            vector<string> sampleNames(fields.begin()+NUM_VCF_NON_GENOTYPE_COLUMNS,fields.end());
             
-            std::vector<std::string>::iterator itP1 = std::find(sampleNames.begin(), sampleNames.end(), parentNames[0]);
-            std::vector<std::string>::iterator itP2 = std::find(sampleNames.begin(), sampleNames.end(), parentNames[1]);
+            vector<string>::iterator itP1 = std::find(sampleNames.begin(), sampleNames.end(), parentNames[0]);
+            vector<string>::iterator itP2 = std::find(sampleNames.begin(), sampleNames.end(), parentNames[1]);
             if (itP1 == sampleNames.end()) {
                 std::cerr << "ERROR: Could not locate parent 1 in the VCF. Exiting..." << std::endl; exit(1);
             }
@@ -124,7 +124,7 @@ int trioPhaseMain(int argc, char** argv) {
                 char offspringAllele1 = offspringGT[0];
                 char offspringAllele2 = offspringGT[1];
                 
-                std::vector<std::string> genotypes(fields.begin()+NUM_VCF_NON_GENOTYPE_COLUMNS,fields.end());
+                vector<string> genotypes(fields.begin()+NUM_VCF_NON_GENOTYPE_COLUMNS,fields.end());
                 if (genotypes[iP1][0] == '.' || genotypes[iP1][2] == '.') continue;
                 if (genotypes[iP2][0] == '.' || genotypes[iP2][2] == '.') continue;
                 
@@ -212,8 +212,8 @@ int trioPhaseMain(int argc, char** argv) {
 
 
 void parseTrioPhaseOptions(int argc, char** argv) {
-    bool die = false; string regionArgString; std::vector<string> regionArgs;
-    std::vector<string> windowSizeStep;
+    bool die = false; string regionArgString; vector<string> regionArgs;
+    vector<string> windowSizeStep;
     for (char c; (c = getopt_long(argc, argv, shortopts, longopts, NULL)) != -1;)
     {
         std::istringstream arg(optarg != NULL ? optarg : "");

@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
     }
     else
     {
-        std::string command(argv[1]);
+        string command(argv[1]);
         if(command == "help" || command == "--help" || command == "-h")
         {
             std::cout << USAGE_MESSAGE;

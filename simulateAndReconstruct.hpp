@@ -25,7 +25,7 @@ public:
         while (getline(*mapFile,line)) {
             // std::cerr << line << std::endl;
             mapRecordN++;
-            std::vector<string> mapRecVec = split(line, '\t');
+            vector<string> mapRecVec = split(line, '\t');
             if(mapRecVec.size() != 3) {
                 std::cerr << "ERROR: The recombination map input file " << mapFileName << " must have three tab-separated columns." << std::endl;
                 std::cerr << "This condition failed on line: " << mapRecordN << ". Exiting...." << std::endl;
@@ -58,9 +58,9 @@ public:
 
     };
     
-    std::vector<RecombIntervalBase> recombIntervals;
+    vector<RecombIntervalBase> recombIntervals;
     
-    void simuateReadPairs(RecombReadPairs* rp, std::vector<int>& readDistances, long long int targetCoverage, double errorRate) {
+    void simuateReadPairs(RecombReadPairs* rp, vector<int>& readDistances, long long int targetCoverage, double errorRate) {
         std::random_device rd; // obtain a random number from hardware
         std::mt19937 gen(rd()); std::mt19937 gen2(rd()); std::mt19937 gen3(rd()); std::mt19937 gen4(rd()); // seed the generator
         std::uniform_int_distribution<> midPosDist(mapPhysicalStart, mapPhysicalEnd); // define the range
@@ -152,7 +152,7 @@ public:
 class RecombMapReconstructedFromSimulations : public RecombMap {
 public:
     
-    std::vector<std::vector<double>> simulationResults2kb;
+    vector<vector<double>> simulationResults2kb;
 };
 
 #endif /* simulateAndReconstruct_hpp */

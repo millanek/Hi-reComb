@@ -24,6 +24,9 @@
 #include "gzstream.hpp"
 
 using std::string;
+using std::vector;
+using std::map;
+
 #define PROGRAM_BIN "Hi-reComb"
 #define PACKAGE_BUGREPORT "millanek@gmail.com"
 #define GZIP_EXT ".gz"
@@ -34,15 +37,15 @@ using std::string;
 // VCF format constant
 static const int NUM_VCF_NON_GENOTYPE_COLUMNS=9;  // 8 mendatory columns + 1 column with definition of the genotype columns
 
-double stringToDouble(std::string s);
-std::vector<std::string> split(const std::string &s, char delim);
-std::vector<double> splitToDouble(const std::string &s, char delim);
-void splitToDouble(const std::string &s, char delim, std::vector<double> &elems);
-void split(const std::string &s, char delim, std::vector<std::string> &elems);
-void assertFileOpen(std::ifstream& fh, const std::string& fn);
-void assertFileOpen(std::ofstream& fh, const std::string& fn);
-std::istream* createReader(const std::string& filename, std::ios_base::openmode mode = std::ios_base::in);
-std::ostream* createWriter(const std::string& filename, std::ios_base::openmode mode = std::ios_base::out);
+double stringToDouble(string s);
+vector<string> split(const string &s, char delim);
+vector<double> splitToDouble(const string &s, char delim);
+void splitToDouble(const string &s, char delim, vector<double> &elems);
+void split(const string &s, char delim, vector<string> &elems);
+void assertFileOpen(std::ifstream& fh, const string& fn);
+void assertFileOpen(std::ofstream& fh, const string& fn);
+std::istream* createReader(const string& filename, std::ios_base::openmode mode = std::ios_base::in);
+std::ostream* createWriter(const string& filename, std::ios_base::openmode mode = std::ios_base::out);
 
 template <class T> double vector_sum(T& vector) {
     double sum = 0;
@@ -59,8 +62,8 @@ template <class T> double vector_average(T& vector) {
 }
 
 // Converting numbers (int, double, size_t, and char) to string
-template <typename T> std::string numToString(T i) {
-    std::string ret;
+template <typename T> string numToString(T i) {
+    string ret;
     std::stringstream out;
     out << i;
     ret = out.str();
@@ -81,14 +84,14 @@ template <class T> void print_vector(T vector, std::ostream& outFile, char delim
 
 class VariantInfo {
 public:
-    VariantInfo(const std::vector<string>& VCFfields) {
+    VariantInfo(const vector<string>& VCFfields) {
         chr = VCFfields[0]; posInt = atoi(VCFfields[1].c_str());
         refAllele = VCFfields[3]; altAlleles = split(VCFfields[4], ',');
         
         if (refAllele.length() > 1) onlyIndel = true;
         else SNPAlleleIndices.push_back(0);
         
-        std::vector<std::string>::iterator it = std::find(altAlleles.begin(), altAlleles.end(), "*");
+        vector<string>::iterator it = std::find(altAlleles.begin(), altAlleles.end(), "*");
         if (it != altAlleles.end()) starPos = (int) std::distance(altAlleles.begin(), it);
         else starPos = -1; // There is no star among the alternative alleles
         
@@ -102,8 +105,8 @@ public:
     string chr;
     int posInt;
     string refAllele;
-    std::vector<string> altAlleles;
-    std::vector<int> SNPAlleleIndices;
+    vector<string> altAlleles;
+    vector<int> SNPAlleleIndices;
     
     bool onlyIndel = false;
     
@@ -155,15 +158,15 @@ public:
     };
     
     double meanRate;
-    std::vector<double> cummulativeRates; // Cummulative rates in cM
+    vector<double> cummulativeRates; // Cummulative rates in cM
     double mapLength; // Map length in cM
     long long int mapPhysicalLength; // Map length in bp
     int mapPhysicalStart; // Map start in bp position on chromosome
     int mapPhysicalEnd; // Map end in bp position on chromosome
     double meanEffectiveCoverage;
-    std::vector<double> physicalWindowR;
-    std::vector<std::vector<int>> physicalWindowStartEnd;
-    std::vector<std::vector<double>> physicalWindowBootstraps;
+    vector<double> physicalWindowR;
+    vector<vector<int>> physicalWindowStartEnd;
+    vector<vector<double>> physicalWindowBootstraps;
     
     double getAverageRateForPhysicalWindow(const int start, const int end) {
         
@@ -175,12 +178,12 @@ public:
         
         // Binary search to find the first interval whose end coordinate is greater
         // or equal to the start of the region in question
-        std::vector<int>::iterator itStart = lower_bound(intervalCoordsVectors[1].begin(),intervalCoordsVectors[1].end(),start);
+        vector<int>::iterator itStart = lower_bound(intervalCoordsVectors[1].begin(),intervalCoordsVectors[1].end(),start);
         int numBPtotal = 0; int numBPthisInterval = 0;
         double sumPerBPvalue = 0; double meanValue = NAN;
         
         if (itStart != intervalCoordsVectors[1].end()) {  // if (start < f[1])    ---  excludind case 1)
-            std::vector<int>::size_type index = std::distance(intervalCoordsVectors[1].begin(), itStart);
+            vector<int>::size_type index = std::distance(intervalCoordsVectors[1].begin(), itStart);
             // Sum the lengths
             while (intervalCoordsVectors[0][index] <= end && index < intervalCoordsVectors[0].size()) { // if (f[0] >= end)   ---    excluding case 2)
                 double valueThisInterval = intervalPerBPrVector[index];
@@ -207,7 +210,7 @@ public:
     }
     
 protected:
-    std::vector< std::vector<int> > intervalCoordsVectors; std::vector<double> intervalPerBPrVector;
+    vector<vector<int>> intervalCoordsVectors; vector<double> intervalPerBPrVector;
 };
 
 

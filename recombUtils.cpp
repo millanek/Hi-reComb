@@ -7,11 +7,11 @@
 
 #include "recombUtils.hpp"
 
-void RecombRead::findHetsInMatchingString(const string& matchSeq, const int startPos, const std::map<int,PhaseInfo*>& positionToPhase) {
+void RecombRead::findHetsInMatchingString(const string& matchSeq, const int startPos, const map<int,PhaseInfo*>& positionToPhase) {
     for (int i = 0; i < matchSeq.length(); i++) {
         if (positionToPhase.count(startPos + i) == 1) {
             PhaseInfo* thisHetPhase = positionToPhase.at(startPos + i);
-            std::vector<char> phasedSNPbases = thisHetPhase->phasedVars;
+            vector<char> phasedSNPbases = thisHetPhase->phasedVars;
             char readBase = matchSeq[i];
             int snpPos = startPos + i;
             HetInfo* het = new HetInfo(snpPos, readBase, int(readQual[i])-33, phasedSNPbases[0], phasedSNPbases[1], thisHetPhase->quality, thisHetPhase->blockNum);
@@ -20,7 +20,7 @@ void RecombRead::findHetsInMatchingString(const string& matchSeq, const int star
     }
 }
 
-void RecombRead::findHetsInRead(const std::map<int,PhaseInfo*>& positionToPhase) {
+void RecombRead::findHetsInRead(const map<int,PhaseInfo*>& positionToPhase) {
     
     int startPos = readPos; string processedReadSeq = readSeq;
     while (GIGARtypes.size() > 0) {
@@ -102,7 +102,7 @@ void RecombRead::generateCIGARvectors() {
     }
 }
 
-void RecombReadPair::findAndCombinePairHets(const std::map<int,PhaseInfo*> & positionToPhase) {
+void RecombReadPair::findAndCombinePairHets(const map<int,PhaseInfo*> & positionToPhase) {
     read1->findHetsInRead(positionToPhase);
     read2->findHetsInRead(positionToPhase);
     
@@ -118,8 +118,8 @@ void RecombReadPair::findAndCombinePairHets(const std::map<int,PhaseInfo*> & pos
 
 void RecombReadPair::filterHetsByQuality(int minQuality) {
     
-    std::vector<HetInfo*> goodHets;
-    for (std::vector<HetInfo*>::iterator it = hetSites.begin(); it != hetSites.end(); it++) {
+    vector<HetInfo*> goodHets;
+    for (vector<HetInfo*>::iterator it = hetSites.begin(); it != hetSites.end(); it++) {
         if ((*it)->thisBaseQuality >= minQuality) {
             goodHets.push_back((*it));
         }
@@ -129,8 +129,8 @@ void RecombReadPair::filterHetsByQuality(int minQuality) {
 
 void RecombReadPair::filterHetsByBlock(int blockNum) {
     
-    std::vector<HetInfo*> goodHets;
-    for (std::vector<HetInfo*>::iterator it = hetSites.begin(); it != hetSites.end(); it++) {
+    vector<HetInfo*> goodHets;
+    for (vector<HetInfo*>::iterator it = hetSites.begin(); it != hetSites.end(); it++) {
         if ((*it)->phaseBlock == blockNum) {
             goodHets.push_back((*it));
         }
@@ -169,7 +169,7 @@ void RecombReadPair::determineIfReadPairConcordantOrDiscordant() {
         pairRecombinationStatus = PAIR_AMBIGUOUS;
 }
 
-DefiningRecombInfo* RecombReadPair::getDefiningHetPair(const std::vector<int>& indicesI, const std::vector<int>& indicesJ) {
+DefiningRecombInfo* RecombReadPair::getDefiningHetPair(const vector<int>& indicesI, const vector<int>& indicesJ) {
     int maxD = 0; int maxDindex = 0;
     int minD = std::numeric_limits<int>::max(); int minDindex = 0;
     for (int i = 0; i != indicesI.size(); i++) {
@@ -191,7 +191,7 @@ DefiningRecombInfo* RecombReadPair::getDefiningHetPair(const std::vector<int>& i
     return thisRecombInfo;
 }
 
-DefiningRecombInfo* RecombReadPair::initialiseRecombInfo(const std::vector<int>& indicesI, const std::vector<int>& indicesJ, const int index) {
+DefiningRecombInfo* RecombReadPair::initialiseRecombInfo(const vector<int>& indicesI, const vector<int>& indicesJ, const int index) {
     
     int iPos = hetSites[indicesI[index]]->pos;
     int jPos = hetSites[indicesJ[index]]->pos;

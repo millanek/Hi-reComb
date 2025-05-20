@@ -43,9 +43,9 @@ namespace opt
 int vioMain(int argc, char** argv) {
     parseVioOptions(argc, argv);
         
-    std::vector<std::string> fields;
+    vector<string> fields;
     int reportProgressEvery = 10000; string chr; string coord;
-    std::map<int,string> offspringPosToGT;
+    map<int,string> offspringPosToGT;
    // std::ostream* outFileAF = createWriter(stripExtension(opt::setsFile) + "_" + opt::runName + "_AF" + ".txt");
     
     string line; // for reading the input files
@@ -58,7 +58,7 @@ int vioMain(int argc, char** argv) {
             continue;
         else if (line[0] == '#' && line[1] == 'C') {
             fields = split(line, '\t');
-            std::vector<std::string> sampleNames(fields.begin()+NUM_VCF_NON_GENOTYPE_COLUMNS,fields.end());
+            vector<string> sampleNames(fields.begin()+NUM_VCF_NON_GENOTYPE_COLUMNS,fields.end());
             if (sampleNames.size() > 1) {
                 std::cerr << "ERROR: The offspring VCF file should only contain one sample." << std::endl; exit(1);
             }
@@ -69,7 +69,7 @@ int vioMain(int argc, char** argv) {
             if (v.altAlleles.size() > 1) continue;
             if (v.altAlleles[0].length() > 1) continue;
             
-            std::vector<std::string> genotypes(fields.begin()+NUM_VCF_NON_GENOTYPE_COLUMNS,fields.end());
+            vector<string> genotypes(fields.begin()+NUM_VCF_NON_GENOTYPE_COLUMNS,fields.end());
             
             string firstAllele; string secondAllele;
             if (genotypes[0][0] == '0') firstAllele = v.refAllele[0];
@@ -87,7 +87,7 @@ int vioMain(int argc, char** argv) {
     
     std::clock_t startTime = std::clock(); int totalVariantNumber = 0;
     
-    std::vector<int> numViolations; int numSharedBetweenVCFs = 0;
+    vector<int> numViolations; int numSharedBetweenVCFs = 0;
     std::cerr << "INFO: Processing the parents VCF file.." << std::endl;
     while (getline(*parentsVcfFile, line)) {
         line.erase(std::remove(line.begin(), line.end(), '\r'), line.end()); // Deal with any left over \r from files prepared on Windows
@@ -95,7 +95,7 @@ int vioMain(int argc, char** argv) {
             continue;
         else if (line[0] == '#' && line[1] == 'C') {
             fields = split(line, '\t');
-            std::vector<std::string> sampleNames(fields.begin()+NUM_VCF_NON_GENOTYPE_COLUMNS,fields.end());
+            vector<string> sampleNames(fields.begin()+NUM_VCF_NON_GENOTYPE_COLUMNS,fields.end());
             print_vector(sampleNames, std::cout);
             numViolations.resize(sampleNames.size(),0);
         } else {
@@ -111,9 +111,9 @@ int vioMain(int argc, char** argv) {
                 numSharedBetweenVCFs++;
             }
             
-            std::vector<std::string> genotypes(fields.begin()+NUM_VCF_NON_GENOTYPE_COLUMNS,fields.end());
+            vector<string> genotypes(fields.begin()+NUM_VCF_NON_GENOTYPE_COLUMNS,fields.end());
             // Go through the genotypes and record all SNP alleles
-            for (std::vector<std::string>::size_type i = 0; i != genotypes.size(); i++) {
+            for (vector<string>::size_type i = 0; i != genotypes.size(); i++) {
                 if (genotypes[i][0] == '.' || genotypes[i][2] == '.') continue;
                 
                 char firstAllele; char secondAllele;
@@ -146,8 +146,8 @@ int vioMain(int argc, char** argv) {
 
 
 void parseVioOptions(int argc, char** argv) {
-    bool die = false; string regionArgString; std::vector<string> regionArgs;
-    std::vector<string> windowSizeStep;
+    bool die = false; string regionArgString; vector<string> regionArgs;
+    vector<string> windowSizeStep;
     for (char c; (c = getopt_long(argc, argv, shortopts, longopts, NULL)) != -1;)
     {
         std::istringstream arg(optarg != NULL ? optarg : "");

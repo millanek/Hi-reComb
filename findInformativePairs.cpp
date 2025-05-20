@@ -66,7 +66,7 @@ int InfoReadsMain(int argc, char** argv) {
     
     std::istream* samtoolsFile = &std::cin;
     
-    std::map<string,std::vector<string> > readNameToSamRecords;
+    map<string,vector<string>> readNameToSamRecords;
     
     AllPhaseInfo* p = new AllPhaseInfo(opt::hetsFile, 0);
     
@@ -81,7 +81,7 @@ int InfoReadsMain(int argc, char** argv) {
             std::cerr << "Processed " << readsProcessed << " reads" << std::endl;
         }
         // std::cerr << line << std::endl;
-        std::vector<string> samRecVec = split(line, '\t'); //assert(pairVec.size() == 8);
+        vector<string> samRecVec = split(line, '\t'); //assert(pairVec.size() == 8);
         int flag = atoi(samRecVec[1].c_str());
         if (flag > 2000) continue;
         
@@ -99,7 +99,7 @@ int InfoReadsMain(int argc, char** argv) {
         delete thisRead;
     }
     
-    for (std::map<string,std::vector<string>>::iterator it = readNameToSamRecords.begin(); it != readNameToSamRecords.end(); it++) {
+    for (map<string,vector<string>>::iterator it = readNameToSamRecords.begin(); it != readNameToSamRecords.end(); it++) {
         if (it->second.size() > 1) {
             std::cout << it->second[0] << std::endl;
             std::cout << it->second[1] << std::endl;

@@ -181,7 +181,7 @@ int RecombFromSAMMain(int argc, char** argv) {
     // Add the original map as the first sample
         rm->physicalWindowBootstraps.push_back(rm->physicalWindowR);
         
-        std::vector<DefiningRecombInfo*> orginalInformativePairs = rp->allInformativePairs;
+        vector<DefiningRecombInfo*> orginalInformativePairs = rp->allInformativePairs;
         for (int i = 0; i < opt::nBootstrap; i++) {
             RecombReadPairs* thisRp = new RecombReadPairs(*rp);
             thisRp->allInformativePairs = thisRp->getBootstrapSample(orginalInformativePairs);

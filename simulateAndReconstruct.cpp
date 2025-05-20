@@ -103,8 +103,8 @@ int SimulationMain(int argc, char** argv) {
     RecombReadPairs* rpRef = new RecombReadPairs(opt::samFile, opt::minDistanceToDefinePairs);
     std::cout << std::endl;
     
-    std::vector<int> readDistances;
-    for (std::vector<RecombReadPair*>::iterator it = rpRef->readPairs.begin(); it != rpRef->readPairs.end(); it++) {
+    vector<int> readDistances;
+    for (vector<RecombReadPair*>::iterator it = rpRef->readPairs.begin(); it != rpRef->readPairs.end(); it++) {
         RecombReadPair* r = *it; int p1 = r->read1->readPos; int p2 = r->read2->readPos; int l = abs(p2 - p1);
         if (l > 200) readDistances.push_back(l);
     }
@@ -114,7 +114,7 @@ int SimulationMain(int argc, char** argv) {
     std::cout << "Error Rate (false positive and false negative crossovers): " << opt::errorRate << std::endl;
     std::cout << std::endl;
     
-    std::vector<std::vector<double>> simulationResults2kb; simulationResults2kb.resize(opt::numReplicates + 1);
+    vector<vector<double>> simulationResults2kb; simulationResults2kb.resize(opt::numReplicates + 1);
     rs->calculateMapForFixedWindowSizes(opt::physicalWindowSize);
     simulationResults2kb[0] = rs->physicalWindowR;
     

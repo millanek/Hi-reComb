@@ -11,10 +11,6 @@
 #include <stdio.h>
 #include "generalUtils.hpp"
 
-using std::string;
-using std::vector;
-using std::map;
-
 #define SOFT_CLIP_CIGAR 'S'
 #define HARD_CLIP_CIGAR 'H'
 #define MATCH_CIGAR 'M'
@@ -72,7 +68,7 @@ class PhaseInfo {
     public:
     PhaseInfo() {};
     
-    PhaseInfo(std::vector<string>& phasedSNPdetails, int blockNumIn): valid(false) {
+    PhaseInfo(vector<string>& phasedSNPdetails, int blockNumIn): valid(false) {
         int H1phase = atoi(phasedSNPdetails[1].c_str()); int H2phase = atoi(phasedSNPdetails[2].c_str());
         assert(phasedSNPdetails[5].length() == 1); assert(phasedSNPdetails[6].length() == 1);
         char refBase = phasedSNPdetails[5][0]; char altBase = phasedSNPdetails[6][0];
@@ -87,7 +83,7 @@ class PhaseInfo {
     };
     
     int pos;
-    std::vector<char> phasedVars;
+    vector<char> phasedVars;
     double quality;
     int coverage;
     int blockNum;
@@ -112,7 +108,7 @@ class ReadLinkSNPpair {
     };
     
     int pos1; int pos2;
-    std::vector<char> base1; std::vector<char> base2;
+    vector<char> base1; vector<char> base2;
     
 };
 
@@ -123,7 +119,7 @@ class RecombRead {
     public:
     RecombRead() {};
     
-    RecombRead(const std::vector<string> samRecVec) : usedLength(0) {
+    RecombRead(const vector<string> samRecVec) : usedLength(0) {
         
         flag = atoi(samRecVec[1].c_str());
         readStrand = assignStrandFromFlag();
@@ -143,20 +139,20 @@ class RecombRead {
     string readStrand; string readName; int readPos; int adjustedReadPos;
     string readSeq; string readQual;
     int MQ; string CIGAR;
-    std::vector<int> GIGARnums; std::vector<char> GIGARtypes;
-    std::vector<int> GIGARnumsNoSI;
+    vector<int> GIGARnums; vector<char> GIGARtypes;
+    vector<int> GIGARnumsNoSI;
     
     int usedLength;
-    std::vector<HetInfo*> hetSites;
-    std::map<int,std::vector<int>> BlockIDsToHetPos;
+    vector<HetInfo*> hetSites;
+    map<int,vector<int>> BlockIDsToHetPos;
     
-    void findHetsInRead(const std::map<int,PhaseInfo*>& positionToPhase);
+    void findHetsInRead(const map<int,PhaseInfo*>& positionToPhase);
     void linkHetsWithPhaseBlock();
     
     private:
         string assignStrandFromFlag();
         void generateCIGARvectors();
-        void findHetsInMatchingString(const string& matchSeq, const int startPos, const std::map<int,PhaseInfo*>& positionToPhase);
+        void findHetsInMatchingString(const string& matchSeq, const int startPos, const map<int,PhaseInfo*>& positionToPhase);
 
 };
 
@@ -178,17 +174,19 @@ class DefiningRecombInfo {
         // With BQ=20 and PQ=20 on both sides, we have the following probabilities:
         // p(ph1=T) = 0.99; p(ph1=F) = 0.01
         // p(ph2=T) = 0.99; p(ph2=F) = 0.01
-        // p(b1=A) = 0.99; p(b1=T) = 0.00333    Assuming equal probability of any base
-        // p(b2=G) = 0.99; p(b2=C) = 0.00333    Assuming equal probability of any base
+        // p(b1=A) = 0.99; p(b1=T) = 0.01 / 3    Assuming equal probability of any base
+        // p(b2=G) = 0.99; p(b2=C) = 0.01 / 3    Assuming equal probability of any base
         if (isRecombined) {
-            // p(ph1=T) * p(ph2=T) * p(b1=A) * p(b2=G)
+            // 1) p(ph1=T) * p(ph2=T) * p(b1=A) * p(b2=G)
             probabilityRecombined = (1 - phaseErrorP_left) * (1 - phaseErrorP_right) * (1 - baseErrorP_left) * (1 - baseErrorP_right);
-            // p(ph1=T) * p(ph2=T) * p(b1=T) * p(b2=C)
+            // 2) p(ph1=T) * p(ph2=T) * p(b1=T) * p(b2=C)
             probabilityRecombined += (1 - phaseErrorP_left) * (1 - phaseErrorP_right) * (baseErrorP_left / 3) * (baseErrorP_right / 3);
-            // p(ph1=T) * p(ph2=F) * p(b1=A) * p(b2=C)
+            // 3a) p(ph1=T) * p(ph2=F) * p(b1=A) * p(b2=C)
             probabilityRecombined += (1 - phaseErrorP_left) * phaseErrorP_right * (1 - baseErrorP_left) * (baseErrorP_right / 3);
-            // p(ph1=F) * p(ph2=T) * p(b1=T) * p(b2=G)
+            // 3b) p(ph1=F) * p(ph2=T) * p(b1=T) * p(b2=G)
             probabilityRecombined += phaseErrorP_left * (1 - phaseErrorP_right) * (baseErrorP_left / 3) * (1 - baseErrorP_right);
+            // 4) p(ph1=F) * p(ph2=F) * p(b1=A) * p(b2=G)
+            probabilityRecombined += phaseErrorP_left * phaseErrorP_right * (1 - baseErrorP_left) * (1 - baseErrorP_right);
             
             
             PrORgivenNR = 1 - probabilityRecombined;
@@ -268,24 +266,24 @@ class RecombReadPair {
     
     int pairSpan;
     int pairRecombinationStatus;
-    std::vector<HetInfo*> hetSites;
+    vector<HetInfo*> hetSites;
     
-    std::vector<int> switchPairI; std::vector<int> switchPairJ;
-    std::vector<int> concordPairI; std::vector<int> concordPairJ;
+    vector<int> switchPairI; vector<int> switchPairJ;
+    vector<int> concordPairI; vector<int> concordPairJ;
     
     
-    //std::map<int,std::vector<int>> BlockIDsToHetPos;
-    //std::map<int> HetPosToBlockIDs;
+    //map<int,vector<int>> BlockIDsToHetPos;
+    //map<int> HetPosToBlockIDs;
     
-    void findAndCombinePairHets(const std::map<int,PhaseInfo*> & positionToPhase);
+    void findAndCombinePairHets(const map<int,PhaseInfo*> & positionToPhase);
     void filterHetsByQuality(int minQuality);
     void filterHetsByBlock(int blockNum);
     void findIndicesOfConcordantAndDiscordantPairsOfHets(const int minDistance);
     void determineIfReadPairConcordantOrDiscordant();
-    DefiningRecombInfo* getDefiningHetPair(const std::vector<int>& indicesI, const std::vector<int>& indicesJ);
+    DefiningRecombInfo* getDefiningHetPair(const vector<int>& indicesI, const vector<int>& indicesJ);
     
 private:
-    DefiningRecombInfo* initialiseRecombInfo(const std::vector<int>& indicesI, const std::vector<int>& indicesJ, const int index);
+    DefiningRecombInfo* initialiseRecombInfo(const vector<int>& indicesI, const vector<int>& indicesJ, const int index);
     
 };
 
@@ -309,7 +307,7 @@ class AllPhaseInfo {
             } else if (line[0] == 'B' && line[1] == 'L') { // New block - separating the hets by blocks
                 blockNum++; phaseBlockSNPnums.push_back(0);
             } else {
-                std::vector<string> phasedSNPdetails = split(line, '\t');
+                vector<string> phasedSNPdetails = split(line, '\t');
                 PhaseInfo* thisPhase = new PhaseInfo(phasedSNPdetails,blockNum);
                 if (thisPhase->valid && thisPhase->coverage > 2
                     //&& (subsetLoci.size() == 0 || subsetLoci.count(thisPhase->pos) == 0)
@@ -322,9 +320,9 @@ class AllPhaseInfo {
         hapcutFile->close();
     }
     
-    std::map<int,PhaseInfo*> posToPhase;
-    std::map <int, bool> subsetLoci;
-    std::vector<int> phaseBlockSNPnums;
+    map<int,PhaseInfo*> posToPhase;
+    map<int,bool> subsetLoci;
+    vector<int> phaseBlockSNPnums;
 };
 
 template <typename T> int roundToNearestValue(T num, int roundingValue)

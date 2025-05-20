@@ -26,13 +26,13 @@ public:
         windowRates.resize(windowSizeMins.size(),0.0);
     }
     
-    void collectAndPrintStats(const string& msg, const std::vector<DefiningRecombInfo*>& informativeReadPairs, const bool bReset, bool bLoud = true) {
+    void collectAndPrintStats(const string& msg, const vector<DefiningRecombInfo*>& informativeReadPairs, const bool bReset, bool bLoud = true) {
         collectStats(informativeReadPairs, bReset);
         if (bLoud) std::cout << msg << std::endl;
         if (bLoud) printRecombReadPairStats();
     }
     
-    void collectStats(const std::vector<DefiningRecombInfo*>& allInformativePairs, const bool bUptate = false) {
+    void collectStats(const vector<DefiningRecombInfo*>& allInformativePairs, const bool bUptate = false) {
         
         if (bUptate) { resetVals();}
         
@@ -69,8 +69,8 @@ public:
     double numConcordant; double numDiscordant;
     long long int totalEffectiveLength; double meanLength;
     double meanRate;
-    std::vector<double> windowRates;
-    std::vector<int> windowSizeMins;
+    vector<double> windowRates;
+    vector<int> windowSizeMins;
     
     void printRecombReadPairStats() {
         for (int j = 0; j != windowSizeMins.size(); j++) {
@@ -89,10 +89,10 @@ public:
     }
     
     
-    std::vector<int> windowSizeMax;
-    std::vector<double> numRecombsInSizeWindows;
-    std::vector<double> numNonRecombsInSizeWindows;
-    std::vector<long long int> lengthOfInformativeSequenceWindows;
+    vector<int> windowSizeMax;
+    vector<double> numRecombsInSizeWindows;
+    vector<double> numNonRecombsInSizeWindows;
+    vector<long long int> lengthOfInformativeSequenceWindows;
 
 private:
     void resetVals() {
@@ -121,11 +121,11 @@ public:
     RecombReadPairs(string readFileName, const int minDistanceToConsider) {
         std::ifstream* samFile = new std::ifstream(readFileName.c_str()); assertFileOpen(*samFile, readFileName);
         string line; int readN = 0;
-        std::vector<RecombRead*> informativeReads;
+        vector<RecombRead*> informativeReads;
         while (getline(*samFile,line)) {
             // std::cerr << line << std::endl;
             readN++;
-            std::vector<string> samRecVec = split(line, '\t'); //assert(pairVec.size() == 8);
+            vector<string> samRecVec = split(line, '\t'); //assert(pairVec.size() == 8);
             RecombRead* thisRead = new RecombRead(samRecVec);
             informativeReads.push_back(thisRead);
             if (readN % 2 == 0) {
@@ -143,28 +143,28 @@ public:
     };
     
     // Read Pairs
-    std::vector<RecombReadPair*> readPairs;
+    vector<RecombReadPair*> readPairs;
     int numDiscordant = 0; int numConcordant = 0; int numAmbiguous = 0; int numTooShort = 0;
     int minLengthFromFiltering = 0;
     
-    std::vector<RecombReadPair*> informativeReadPairs;
+    vector<RecombReadPair*> informativeReadPairs;
     
     // Base quality stats
     int numMatch = 0; int numMismatch = 0;
-    std::vector<double> matchBaseScores; std::vector<double> mismatchBaseScores;
-//    std::vector<double> concordantBaseScores; std::vector<double> discordantBaseScores;
+    vector<double> matchBaseScores; vector<double> mismatchBaseScores;
+//    vector<double> concordantBaseScores; vector<double> discordantBaseScores;
     
     // Recombination stats
-    std::vector<DefiningRecombInfo*> allInformativePairs;
+    vector<DefiningRecombInfo*> allInformativePairs;
     RecombReadPairsStats* stats;
     
     // Records about recombination-informative het sites
-    std::map<int, CoveredHetInfo*> coveredHets;
-    std::vector<int> coveredHetPos;
-    std::vector<int> coveragePerHetDiscord;
-    std::vector<int> coveragePerHetConcord;
+    map<int, CoveredHetInfo*> coveredHets;
+    vector<int> coveredHetPos;
+    vector<int> coveragePerHetDiscord;
+    vector<int> coveragePerHetConcord;
     
-    void linkWithHets(const std::map<int,PhaseInfo*>& posToPhase, const std::map <int, bool>& subsetLoci, const int minBQ) {
+    void linkWithHets(const map<int,PhaseInfo*>& posToPhase, const map<int, bool>& subsetLoci, const int minBQ) {
         for (int i = 0; i < readPairs.size(); i++) {
             RecombReadPair* thisReadPair = readPairs[i];
             thisReadPair->findAndCombinePairHets(posToPhase);
@@ -191,7 +191,7 @@ public:
             if (thisReadPair->hetSites.size() > 1 && !bContainsSubsetLoci) {
                 thisReadPair->read1->linkHetsWithPhaseBlock();
                 thisReadPair->read2->linkHetsWithPhaseBlock();
-                for (std::map<int, std::vector<int>>::iterator it = thisReadPair->read1->BlockIDsToHetPos.begin();
+                for (map<int, vector<int>>::iterator it = thisReadPair->read1->BlockIDsToHetPos.begin();
                     it != thisReadPair->read1->BlockIDsToHetPos.end(); it++) {
                     if (thisReadPair->read2->BlockIDsToHetPos.count(it->first) == 1) {
                         informativeReadPairs.push_back(thisReadPair);
@@ -206,7 +206,7 @@ public:
     
     void categorisePairs(const int minDistanceToDefinePairs) {
         DefiningRecombInfo* thisPairInformation;
-        for (std::vector<RecombReadPair*>::iterator it = informativeReadPairs.begin(); it != informativeReadPairs.end(); it++) {
+        for (vector<RecombReadPair*>::iterator it = informativeReadPairs.begin(); it != informativeReadPairs.end(); it++) {
             RecombReadPair* thisReadPair = *it;
             
             thisReadPair->findIndicesOfConcordantAndDiscordantPairsOfHets(minDistanceToDefinePairs);
@@ -280,7 +280,7 @@ public:
     
     void findUniqueHetsCoveredByReadsAndSortThem() {
         std::sort(coveredHetPos.begin(), coveredHetPos.end());
-        std::vector<int>::iterator it = std::unique(coveredHetPos.begin(), coveredHetPos.end());
+        vector<int>::iterator it = std::unique(coveredHetPos.begin(), coveredHetPos.end());
         coveredHetPos.resize(distance(coveredHetPos.begin(),it));
         for (int i = 0; i != coveredHetPos.size(); i++) {
             coveredHets[coveredHetPos[i]] = new CoveredHetInfo();
@@ -292,17 +292,17 @@ public:
         for (int i = 0; i != coveredHetPos.size(); i++) {
             hetPosToIndex[coveredHetPos[i]] = i;
         }
-        std::vector<int> usedIndices;
+        vector<int> usedIndices;
         for (int i = 0; i != allInformativePairs.size(); i++) {
             usedIndices.push_back(hetPosToIndex.at(allInformativePairs[i]->posLeft));
             usedIndices.push_back(hetPosToIndex.at(allInformativePairs[i]->posRight));
         }
         std::sort(usedIndices.begin(), usedIndices.end());
-        std::vector<int>::iterator it = std::unique(usedIndices.begin(), usedIndices.end());
+        vector<int>::iterator it = std::unique(usedIndices.begin(), usedIndices.end());
         usedIndices.resize(distance(usedIndices.begin(),it));
         std::cout << "Number of heterozygous sites covered by used informative read pairs = " << usedIndices.size() << std::endl;
         
-        std::vector<int> usedCoveredHetPos;
+        vector<int> usedCoveredHetPos;
         for (const int& index : usedIndices) {
             if (index >= 0 && index < coveredHetPos.size()) {
                 usedCoveredHetPos.push_back(coveredHetPos[index]);
@@ -357,7 +357,7 @@ public:
     
     void findAndRemoveReadPairsCoveringMultiHets(const string& rn) {
         
-        std::vector<int> problematicSNPs;
+        vector<int> problematicSNPs;
     /*    for (int i = 0; i != coveredHetPos.size(); i++) {
             if (coveragePerHetDiscord[i] >= 2 && coveragePerHetConcord[i] == 0) problematicSNPs.push_back(coveredHetPos[i]);
         } */
@@ -366,7 +366,7 @@ public:
             if (coveredHets.at(coveredHetPos[i])->coverageDiscord >= 2 && coveredHets.at(coveredHetPos[i])->coverageConcord == 0) problematicSNPs.push_back(coveredHetPos[i]);
         }
         
-        std::vector<int> readPairsToRemove;
+        vector<int> readPairsToRemove;
         for (int i = 0; i != problematicSNPs.size(); i++) {
             for (int j = 0; j != allInformativePairs.size(); j++) {
                 if((allInformativePairs[j]->posLeft == problematicSNPs[i] || allInformativePairs[j]->posRight == problematicSNPs[i])){
@@ -390,12 +390,12 @@ public:
     
     
     
-    std::vector<DefiningRecombInfo*> getBootstrapSample(const std::vector<DefiningRecombInfo*> orginalInformativePairs) {
+    vector<DefiningRecombInfo*> getBootstrapSample(const vector<DefiningRecombInfo*> orginalInformativePairs) {
         std::random_device rd; // obtain a random number from hardware
         std::mt19937 gen(rd()); // seed the generator
         std::uniform_int_distribution<> distr(0, (int)orginalInformativePairs.size() - 1); // define the range
         
-        std::vector<DefiningRecombInfo*> bootstrapSample(orginalInformativePairs.size());
+        vector<DefiningRecombInfo*> bootstrapSample(orginalInformativePairs.size());
         for (int i = 0; i < orginalInformativePairs.size(); i++) {
             int s = distr(gen);
             bootstrapSample[i] = orginalInformativePairs[s];
@@ -497,7 +497,7 @@ public:
         int chrLength = lastHetPos - firstHetPos; assert(chrLength > 0);
         
         fixLeftAndRightSidesOfReadPairs();
-        std::vector<int> indicesToRemove;
+        vector<int> indicesToRemove;
         for (int i = (int)allInformativePairs.size() - 1; i >= 0; i--) {
             int readPairLength = allInformativePairs[i]->posRight - allInformativePairs[i]->posLeft + 1;
             if (readPairLength > (maxLengthFractionOfChromosome * chrLength)) indicesToRemove.push_back(i);
@@ -545,7 +545,7 @@ public:
         std::cerr << "coveredHetPos.front(): " << coveredHetPos.front() << std::endl;
         std::cerr << "coveredHetPos.back(): " << coveredHetPos.back() << std::endl;
         
-       // std::vector<int> indicesToRemove;
+       // vector<int> indicesToRemove;
         for (int i = 0; i != allInformativePairs.size(); i++) {
             if (allInformativePairs[i]->posLeft <= coveredHetPos.front()) {
                /* if (allInformativePairs[i]->posRight + minLengthFromFiltering < coveredHetPos.front()) {
@@ -615,10 +615,10 @@ private:
     // linking stats
     int num0het = 0; int num1het = 0; int num2plusHets = 0;
     int totalUsedReadLengthBp = 0;
-    std::map<int,int> hetPosToIndex;
+    map<int,int> hetPosToIndex;
     
     void categoriseBaseMatchMismatch(RecombReadPair* thisReadPair) {
-        std::vector<HetInfo*>::iterator it = thisReadPair->hetSites.begin();
+        vector<HetInfo*>::iterator it = thisReadPair->hetSites.begin();
         while(it != thisReadPair->hetSites.end()) {
             HetInfo* thisHet = *it;
             if (thisHet->readPhaseBaseMismatch) {
@@ -719,9 +719,9 @@ public:
         effectiveCoverage = (int)coveringReadPairs.size();
     };
     
-    std::vector<double> bootstrapRecombFractions;
+    vector<double> bootstrapRecombFractions;
     
-    std::vector<DefiningRecombInfo*> coveringReadPairs;
+    vector<DefiningRecombInfo*> coveringReadPairs;
     int effectiveCoverage;
     int directReadCoverageConcord;
     int directReadCoverageDiscord;
@@ -816,7 +816,7 @@ public:
         }
     };
     
-    std::vector<RecombInterval> recombIntervals;
+    vector<RecombInterval> recombIntervals;
     double edgeMinimumCoverage;
     RecombReadPairs* readPairs;
     
@@ -936,7 +936,7 @@ public:
     }
     
     void printPerHetCoverageStats(string fn) {
-        std::vector<int> problematicSNPs;
+        vector<int> problematicSNPs;
         std::ofstream* depthFile = new std::ofstream(fn);
         *depthFile << "pos" << "\t" << "ratePerBp" << "\t" << "EffectiveDepth" << "\t" << "directReadCoverageConcord" << "\t" <<
                       "directReadCoverageDiscord" << std::endl;
@@ -1002,7 +1002,7 @@ private:
         int pc = 0; int update5pcInterval = (int)recombIntervals.size() / 20;
         if (bLoud) std::cout << "Updating recombination fractions: ";
         
-        std::vector<double> updatedRecombFractionsPerBp; updatedRecombFractionsPerBp.resize(recombIntervals.size());
+        vector<double> updatedRecombFractionsPerBp; updatedRecombFractionsPerBp.resize(recombIntervals.size());
         for (int j = 0; j < recombIntervals.size(); j++) {
             if (bLoud) if (j > 0 && j % update5pcInterval == 0) { pc += 5; printPcUpdateOnPrompt(pc); }
           //  assert(recombIntervals[j].coveringReadPairs.size() > edgeMinimumCoverage);
@@ -1024,8 +1024,8 @@ private:
     
     
     // Weighed average recombination rate for reads that cover this interval
-    double weighedAverageRateUnderCoveringReads(std::vector<DefiningRecombInfo*>& coveringReadPairs, int rpJ) {
-        std::vector<int> coverageCounts; coverageCounts.resize(recombIntervals.size(),0);
+    double weighedAverageRateUnderCoveringReads(vector<DefiningRecombInfo*>& coveringReadPairs, int rpJ) {
+        vector<int> coverageCounts; coverageCounts.resize(recombIntervals.size(),0);
         int leftMostIndex = std::numeric_limits<int>::max(); int rightMostIndex = 0;
         for (int i = 0; i < coveringReadPairs.size(); i++) {
             if (coveringReadPairs[i]->indexLeft < leftMostIndex) leftMostIndex = coveringReadPairs[i]->indexLeft;
@@ -1088,7 +1088,7 @@ private:
     }
     
     void removeIntervalsWithInsufficientEffectiveCoverage() {
-        std::vector<int> indicesToRemove;
+        vector<int> indicesToRemove;
       //  std::cerr << "readPairs->coveredHetPos.size(): " << readPairs->coveredHetPos.size() << std::endl;
       //  std::cerr << "recombIntervals.size(): " << recombIntervals.size() << std::endl;
         bool leftEdgeLimitFound = false;
