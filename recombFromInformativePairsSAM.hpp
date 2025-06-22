@@ -403,7 +403,9 @@ public:
         return bootstrapSample;
     }
     
-    void considerDoubleCrossovers() {
+    void considerDoubleCrossovers(const int minDistanceToConsiderPairs) {
+        // If the read-pair is recombined, we calculate the double crossover probability
+        // based on the distance between the two informative hets
         for (int j = 0; j < allInformativePairs.size(); j++) {
             if (!allInformativePairs[j]->isRecombined) { // If the read isn't recombined
                 double lambda = stats->meanRate * allInformativePairs[j]->dist;
@@ -414,12 +416,12 @@ public:
                     std::cerr << "lambda: " << lambda << std::endl;
                     std::cerr << std::endl;
                 }
-                
-                
-                // If distance is less than 1Mb, we set double crossover to zero because of crossover interference
-                if (allInformativePairs[j]->dist > 1000000) {
+
+
+                // If distance is less than minDistanceToConsiderPairs, we set double crossover to zero because of crossover interference
+                if (allInformativePairs[j]->dist > minDistanceToConsiderPairs) {
                     // Poisson Probability mass function using the mean rate
-                    // not worried for now about triple and more crossover
+                    // not considering triple and more crossover (lambda^k * exp(-lambda)) / k!
                     allInformativePairs[j]->doubleCrossoverProbability = (pow(lambda, 2.0) * exp(-lambda)) / 2.0;
                 }
                 

@@ -38,6 +38,9 @@ HelpOption RunNameOption
 "       -x, --minCoverageF=NUM                   (default: 0.2) Minimum coverage fraction around chromosome edges\n"
 "       -s, --subsetHets=FILE.txt               (optional) Exclude the sites specified in this file\n"
 "       -v, --verbose                           Verbose info to std_out\n"
+"       --minDforDoubleCrossovers=NUM           (default: 1000000) minimum distance (bp) to consider for double crossovers\n"
+"                                               (should be be based on the extent of crossover interference in the species)\n"
+"                                               (if set to > chromosome length, double crossovers will not be considered)\n"
 "\n"
 "OUTPUT OPTIONS:\n"
 "       -b, --bootstrap=N                       Output N bootstrap replicates into bootstrap_RN.txt\n"
@@ -48,6 +51,8 @@ HelpOption RunNameOption
 "       -i, --intermediateMaps                  Output maps at each EM iteration\n"
 "\n"
 "\nReport bugs to " PACKAGE_BUGREPORT "\n\n";
+
+enum { OPT_DOUBLE_CROSS };
 
 static const char* shortopts = "hn:q:m:p:d:s:f:crb:e:ivx:";
 
@@ -67,6 +72,7 @@ static const struct option longopts[] = {
     { "intermediateMaps",   no_argument, NULL, 'i' },
     { "minCoverageF",   required_argument, NULL, 'x' },
     { "verbose",   no_argument, NULL, 'v' },
+    { "minDforDoubleCrossovers", required_argument, NULL, OPT_DOUBLE_CROSS },
     { NULL, 0, NULL, 0 }
 };
 
@@ -87,6 +93,7 @@ namespace opt
     static int nBootstrap = 0;
     static double epsilon = 0.01;
     static int maxEMiterations = 10;
+    static double minDistForDoubleCrossovers = 1000000; // Default is 1Mb, can be set to a larger value to disable double crossovers
 
     // These are fixed for now
     static double minCoverage = 0.2;
@@ -114,7 +121,7 @@ int RecombFromSAMMain(int argc, char** argv) {
     rp->printReadPairStatsByCategory(opt::minDistanceToDefinePairs); 
     rp->stats->collectAndPrintStats("Initial rates/stats by read pair distances: ", rp->allInformativePairs, true, opt::v);
     
-    rp->considerDoubleCrossovers(); rp->stats->collectAndPrintStats("Adjusted for double-crossovers: ", rp->allInformativePairs, true, opt::v);
+    rp->considerDoubleCrossovers(opt::minDistForDoubleCrossovers); rp->stats->collectAndPrintStats("Adjusted for double-crossovers: ", rp->allInformativePairs, true, opt::v);
     //rp->adjustRecombinationProbabilities(); // Adjust probabilities based on read-length distributions
     rp->adjustRecombinationProbabilitiesBayes();
     rp->adjustRecombinationProbabilities(); 
@@ -227,6 +234,13 @@ void parseRecombFromSAMOptions(int argc, char** argv) {
             case 'b': arg >> opt::nBootstrap; break;
             case 'e': arg >> opt::epsilon; break;
             case 'x': arg >> opt::minCoverage; break;
+            case OPT_DOUBLE_CROSS:
+                arg >> opt::minDistForDoubleCrossovers;
+                if (opt::minDistForDoubleCrossovers < 0) {
+                    std::cerr << "Error: the --minDforDoubleCrossovers parameter should be non-negative\n";
+                    die = true;
+                }
+                break;
             case 'h':
                 std::cout << DISCORDPAIRS_USAGE_MESSAGE;
                 exit(EXIT_SUCCESS);
