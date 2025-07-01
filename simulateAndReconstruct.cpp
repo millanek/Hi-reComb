@@ -24,13 +24,11 @@ HelpOption RunNameOption
 "       -x, --errorRate                         (default: 0.01) error rate per read pair (false positive or false negative)\n"
 "\n"
 "RECONSTRUCTION OPTIONS:\n"
-"       -q, --min-BQ                            (default: 30) the minimum base quality for assesssing discordant phase\n"
 "       -d, --min-Dist                          (default: 1000) the minimum distance (bp) to consider discordant phase a recombination\n"
 "                                               as opposed to gene conversion\n"
 "       -e, --epsilon=NUM                       (default: 0.0001) sets when the EM algorithm is deemed to have converged\n"
 "                                               the smaller the epsilon the more EM iterations will be run\n"
 "       -m, --maxEM=NUM                         (default: 10) maximum number of EM iterations to run\n"
-//"       -p, --min-PQ                            (default: 10) the minimum phase quality for assesssing discordant phase\n"
 "\n"
 "OUTPUT OPTIONS:\n"
 "       -f, --fixed-window=SIZE                 (default: 2000) Fixed window size (in bp) for the output; the SIZE should be at least 1000bp\n"
@@ -39,7 +37,7 @@ HelpOption RunNameOption
 "\n"
 "\nReport bugs to " PACKAGE_BUGREPORT "\n\n";
 
-static const char* shortopts = "hn:q:m:p:d:f:r:e:vt:x:i";
+static const char* shortopts = "hn:m:p:d:f:r:e:vt:x:i";
 
 enum { OPT_PAIR_INFO  };
 
@@ -54,8 +52,6 @@ static const struct option longopts[] = {
     { "errorRate",   no_argument, NULL, 'x' },
     
     { "fixed-window",   required_argument, NULL, 'f' },
-    { "min-BQ",   required_argument, NULL, 'q' },
-    { "min-PQ",   required_argument, NULL, 'p' },
     { "min-Dist",   required_argument, NULL, 'd' },
     { "coverageStats",   no_argument, NULL, 'c' },
     { "epsilon",   required_argument, NULL, 'e' },
@@ -79,13 +75,12 @@ namespace opt
 
     static bool outputReadPairInfo = false;
 
-    static int minBQ = 30;
-    static int minPQ = 10;
     static int minDist = 1000;
     static int physicalWindowSize = 2000;
     static double epsilon = 0.00001;
     static int maxEMiterations = 10;
     static bool bIntermediateMaps = false;
+
 
     // These are fixed for now
     static double minCoverage = 0.33;
@@ -141,8 +136,7 @@ int SimulationMain(int argc, char** argv) {
         // std::cout << "Removal done... " << std::endl;
         rp->calculateDirectCoverageOnEachHetMap();
         // std::cout << "Direct coverage calculated... " << std::endl;
-        rp->findAndRemoveReadPairsCoveringMultiHets(opt::runName);
-        
+
         rp->findWhichHetsAreUsedByFinalReadPairSet(); // For each informative read-pair, find the indices of the bounding SNPs in the sorted het vector
         rp->updateBoundingHetIndicesForEachReadPair();
         
@@ -212,10 +206,8 @@ void parseSimulationOptions(int argc, char** argv) {
             case 't': arg >> opt::targetCoverage; break;
             case 'x': arg >> opt::errorRate; break;
                 
-            case 'q': arg >> opt::minBQ; break;
             case 'm': arg >> opt::maxEMiterations; break;
             case 'd': arg >> opt::minDist; break;
-            case 'p': arg >> opt::minPQ; break;
             case 'f': arg >> opt::physicalWindowSize; break;
             case 'e': arg >> opt::epsilon; break;
             

@@ -82,12 +82,11 @@ int InfoReadsMain(int argc, char** argv) {
         }
         // std::cerr << line << std::endl;
         vector<string> samRecVec = split(line, '\t'); //assert(pairVec.size() == 8);
-        int flag = atoi(samRecVec[1].c_str());
+        int flag = safeStringToInt(samRecVec[1]);
         if (flag > 2000) continue;
-        
-        int MQ = atoi(samRecVec[4].c_str());
-        if (MQ < opt::minMQ) continue;
-        
+
+        int MQ = safeStringToInt(samRecVec[4]);
+        if (MQ < opt::minMQ) continue;      
         
         RecombRead* thisRead = new RecombRead(samRecVec);
         

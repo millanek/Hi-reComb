@@ -36,7 +36,18 @@ vector<string> split(const string &s, char delim) {
     return elems;
 }
 
-double stringToDouble(string s) {
+int safeStringToInt(const string& s) {
+    int value;
+    std::stringstream ss(s); //turn the string into a stream
+    ss >> value; //convert
+    if(ss.fail()) {
+        std::cerr << "Error: could not convert '" << s << "' to an integer\n";
+        exit(EXIT_FAILURE);
+    }
+    return value;
+}
+
+double stringToDouble(const string& s) {
     double d;
     std::stringstream ss(s); //turn the string into a stream
     ss >> d; //convert

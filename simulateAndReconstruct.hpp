@@ -31,7 +31,7 @@ public:
                 std::cerr << "This condition failed on line: " << mapRecordN << ". Exiting...." << std::endl;
                 exit(1);
             }
-            RecombIntervalBase* thisInterval = new RecombIntervalBase(mapRecordN, atoi(mapRecVec[0].c_str()), atoi(mapRecVec[1].c_str()), stringToDouble(mapRecVec[2]));
+            RecombIntervalBase* thisInterval = new RecombIntervalBase(mapRecordN, safeStringToInt(mapRecVec[0]), safeStringToInt(mapRecVec[1]), stringToDouble(mapRecVec[2]));
             recombIntervals.push_back(*thisInterval);
         }
         

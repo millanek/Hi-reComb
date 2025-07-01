@@ -37,7 +37,8 @@ using std::map;
 // VCF format constant
 static const int NUM_VCF_NON_GENOTYPE_COLUMNS=9;  // 8 mendatory columns + 1 column with definition of the genotype columns
 
-double stringToDouble(string s);
+int safeStringToInt(const string& s); // Convert a string to an int, with error checking
+double stringToDouble(const string& s);
 vector<string> split(const string &s, char delim);
 vector<double> splitToDouble(const string &s, char delim);
 void splitToDouble(const string &s, char delim, vector<double> &elems);
@@ -85,7 +86,7 @@ template <class T> void print_vector(T vector, std::ostream& outFile, char delim
 class VariantInfo {
 public:
     VariantInfo(const vector<string>& VCFfields) {
-        chr = VCFfields[0]; posInt = atoi(VCFfields[1].c_str());
+        chr = VCFfields[0]; posInt = safeStringToInt(VCFfields[1]);
         refAllele = VCFfields[3]; altAlleles = split(VCFfields[4], ',');
         
         if (refAllele.length() > 1) onlyIndel = true;

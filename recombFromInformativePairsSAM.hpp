@@ -16,10 +16,11 @@ int RecombFromSAMMain(int argc, char** argv);
 
 class RecombReadPairsStats {
 public:
-    
-    RecombReadPairsStats(const int minDistanceToConsider): numConcordant(0), numDiscordant(0), totalEffectiveLength(0), meanRate(0.0) {
-        windowSizeMins = {minDistanceToConsider,1000,5000,10000,100000,1000000};
-        windowSizeMax = {1000,5000,10000,100000,1000000,1000000000};
+
+    RecombReadPairsStats(const int minDistanceToConsider, const int FPshortThreshold, const int FPlongThreshold): 
+                        numConcordant(0), numDiscordant(0), totalEffectiveLength(0), meanRate(0.0) {
+        windowSizeMins = {minDistanceToConsider,FPshortThreshold,5000,10000,100000,FPlongThreshold};
+        windowSizeMax = {FPshortThreshold,5000,10000,100000,FPlongThreshold,1000000000};
         numRecombsInSizeWindows.resize(windowSizeMins.size(),0.0);
         numNonRecombsInSizeWindows.resize(windowSizeMins.size(),0.0);
         lengthOfInformativeSequenceWindows.resize(windowSizeMins.size(),0);
@@ -118,7 +119,8 @@ class RecombReadPairs {
 public:
     // Parse the samtools file to find reads that match records from the pairstools file
     // and therefore  can be informative about the phasing and recombination
-    RecombReadPairs(string readFileName, const int minDistanceToConsider) {
+    RecombReadPairs(string readFileName, const int minDistanceToConsider, 
+                    const int FPshortThreshold = 1000, const int FPlongThreshold = 1000000) {
         std::ifstream* samFile = new std::ifstream(readFileName.c_str()); assertFileOpen(*samFile, readFileName);
         string line; int readN = 0;
         vector<RecombRead*> informativeReads;
@@ -134,12 +136,13 @@ public:
                 informativeReads.clear();
             }
         }
-        stats = new RecombReadPairsStats(minDistanceToConsider);
+
+        stats = new RecombReadPairsStats(minDistanceToConsider, FPshortThreshold, FPlongThreshold);
     };
     
     // Empty base constructor
     RecombReadPairs() {
-        stats = new RecombReadPairsStats(200); // 200 = minDistanceToConsider
+        stats = new RecombReadPairsStats(200, 1000, 1000000); // 200 = minDistanceToConsider, 1000 = FPshortThreshold, 1000000 = FPlongThreshold
     };
     
     // Read Pairs
@@ -355,15 +358,14 @@ public:
         }
     }
     
-    void findAndRemoveReadPairsCoveringMultiHets(const string& rn) {
+    void findAndRemoveReadPairsCoveringMultiHets(const int minDiscordant, const int maxConcordant) {
         
         vector<int> problematicSNPs;
-    /*    for (int i = 0; i != coveredHetPos.size(); i++) {
-            if (coveragePerHetDiscord[i] >= 2 && coveragePerHetConcord[i] == 0) problematicSNPs.push_back(coveredHetPos[i]);
-        } */
         
         for (int i = 0; i != coveredHetPos.size(); i++) {
-            if (coveredHets.at(coveredHetPos[i])->coverageDiscord >= 2 && coveredHets.at(coveredHetPos[i])->coverageConcord == 0) problematicSNPs.push_back(coveredHetPos[i]);
+            if (coveredHets.at(coveredHetPos[i])->coverageDiscord >= minDiscordant && 
+                coveredHets.at(coveredHetPos[i])->coverageConcord <= maxConcordant) 
+                { problematicSNPs.push_back(coveredHetPos[i]); }
         }
         
         vector<int> readPairsToRemove;

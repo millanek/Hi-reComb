@@ -69,7 +69,7 @@ class PhaseInfo {
     PhaseInfo() {};
     
     PhaseInfo(vector<string>& phasedSNPdetails, int blockNumIn): valid(false) {
-        int H1phase = atoi(phasedSNPdetails[1].c_str()); int H2phase = atoi(phasedSNPdetails[2].c_str());
+        int H1phase = safeStringToInt(phasedSNPdetails[1]); int H2phase = safeStringToInt(phasedSNPdetails[2]);
         assert(phasedSNPdetails[5].length() == 1); assert(phasedSNPdetails[6].length() == 1);
         char refBase = phasedSNPdetails[5][0]; char altBase = phasedSNPdetails[6][0];
         if (H1phase == 0 && H2phase == 1) {
@@ -77,8 +77,8 @@ class PhaseInfo {
         } else if (H1phase == 1 && H2phase == 0) {
             phasedVars.push_back(altBase); phasedVars.push_back(refBase); valid = true;
         }
-        pos = atoi(phasedSNPdetails[4].c_str()); quality = stringToDouble(phasedSNPdetails[10].c_str());
-        coverage = atoi(phasedSNPdetails[11].c_str());
+        pos = safeStringToInt(phasedSNPdetails[4]); quality = stringToDouble(phasedSNPdetails[10]);
+        coverage = safeStringToInt(phasedSNPdetails[11]);
         blockNum = blockNumIn;
     };
     
@@ -120,11 +120,11 @@ class RecombRead {
     RecombRead() {};
     
     RecombRead(const vector<string> samRecVec) : usedLength(0) {
-        
-        flag = atoi(samRecVec[1].c_str());
+
+        flag = safeStringToInt(samRecVec[1]);
         readStrand = assignStrandFromFlag();
-        readName = samRecVec[0]; readPos = atoi(samRecVec[3].c_str());
-        MQ = atoi(samRecVec[4].c_str()); CIGAR = samRecVec[5];
+        readName = samRecVec[0]; readPos = safeStringToInt(samRecVec[3]);
+        MQ = safeStringToInt(samRecVec[4]); CIGAR = samRecVec[5];
         readSeq = samRecVec[9]; readQual = samRecVec[10];
         
         generateCIGARvectors();
@@ -296,7 +296,7 @@ class AllPhaseInfo {
         if (!subsetFileName.empty()) {
             std::ifstream* subsetFile = new std::ifstream(subsetFileName.c_str()); assertFileOpen(*subsetFile, subsetFileName);
             while (getline(*subsetFile, line)) {
-                subsetLoci[atoi(line.c_str())] = true;
+                subsetLoci[safeStringToInt(line)] = true;
             }
         }
         int blockNum = 0;
@@ -308,6 +308,9 @@ class AllPhaseInfo {
                 blockNum++; phaseBlockSNPnums.push_back(0);
             } else {
                 vector<string> phasedSNPdetails = split(line, '\t');
+                if (phasedSNPdetails[1] == "-" || phasedSNPdetails[2] == "-") {
+                    continue; // Skip this line if it does not have a valid phase
+                }
                 PhaseInfo* thisPhase = new PhaseInfo(phasedSNPdetails,blockNum);
                 if (thisPhase->valid && thisPhase->coverage > 2
                     //&& (subsetLoci.size() == 0 || subsetLoci.count(thisPhase->pos) == 0)

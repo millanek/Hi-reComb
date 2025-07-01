@@ -93,7 +93,7 @@ void RecombRead::generateCIGARvectors() {
          //   std::cout << "CIGARnum: " << CIGARnum << std::endl;
         } else {
            // std::cout << "CIGARnum: " << CIGARnum << std::endl;
-            int CIGARnumInt = atoi(CIGARnum.c_str());
+            int CIGARnumInt = safeStringToInt(CIGARnum);
             GIGARnums.push_back(CIGARnumInt);
             if (CIGAR[i] != SOFT_CLIP_CIGAR && CIGAR[i] != INSERTION_CIGAR) GIGARnumsNoSI.push_back(CIGARnumInt);
             GIGARtypes.push_back(CIGAR[i]);
