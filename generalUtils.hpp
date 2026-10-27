@@ -186,7 +186,7 @@ public:
         if (itStart != intervalCoordsVectors[1].end()) {  // if (start < f[1])    ---  excludind case 1)
             vector<int>::size_type index = std::distance(intervalCoordsVectors[1].begin(), itStart);
             // Sum the lengths
-            while (intervalCoordsVectors[0][index] <= end && index < intervalCoordsVectors[0].size()) { // if (f[0] >= end)   ---    excluding case 2)
+            while (index < intervalCoordsVectors[0].size() && intervalCoordsVectors[0][index] <= end) { // if (f[0] >= end)   ---    excluding case 2)
                 double valueThisInterval = intervalPerBPrVector[index];
 
               //  std::cerr << "valuesThisFeature[0]\t" << valuesThisFeature[0] << std::endl;
