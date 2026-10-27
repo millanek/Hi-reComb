@@ -161,7 +161,7 @@ class RecombRead {
 class DefiningRecombInfo {
     public:
     
-    DefiningRecombInfo(HetInfo* iHet, HetInfo* jHet, int pairRecombinationStatus): indexLeft(-1), indexRight(-1), sum_r_k(NAN), doubleCrossoverProbability(0) {
+    DefiningRecombInfo(HetInfo* iHet, HetInfo* jHet, int pairRecombinationStatus): indexLeft(-1), indexRight(-1), sum_r_k(NAN), doubleCrossoverProbability(0), probabilityRecombined(0.0), PrORgivenNR(0.0) {
         posLeft = iHet->pos; posRight = jHet->pos; dist = abs(posRight - posLeft) + 1;
         phaseErrorP_left = transformFromPhred(iHet->thisPhaseQuality); phaseErrorP_right = transformFromPhred(jHet->thisPhaseQuality);
         baseErrorP_left = transformFromPhred(iHet->thisBaseQuality); baseErrorP_right = transformFromPhred(jHet->thisBaseQuality);
@@ -313,7 +313,7 @@ class AllPhaseInfo {
                 }
                 PhaseInfo* thisPhase = new PhaseInfo(phasedSNPdetails,blockNum);
                 if (thisPhase->valid && thisPhase->coverage > 2
-                    //&& (subsetLoci.size() == 0 || subsetLoci.count(thisPhase->pos) == 0)
+                    && (subsetLoci.size() == 0 || subsetLoci.count(thisPhase->pos) == 0)
                     && thisPhase->quality >= minPhaseQual) {
                     posToPhase[thisPhase->pos] = thisPhase;
                     phaseBlockSNPnums[blockNum-1]++;
